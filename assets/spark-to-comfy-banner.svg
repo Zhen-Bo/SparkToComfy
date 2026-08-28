@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-label="SparkToComfy — ComfyUI generation console">
+  <rect width="1200" height="320" rx="24" fill="#100D0B"/>
+
+  <!-- Deep sky ground. Sparse and cool, so nothing here competes with the mark. -->
+  <g fill="#F2EDE7">
+    <circle cx="196" cy="52" r="1.7" opacity="0.3"/>
+    <circle cx="286" cy="268" r="1.4" opacity="0.22"/>
+    <circle cx="408" cy="74" r="1.3" opacity="0.24"/>
+    <circle cx="512" cy="282" r="1.9" opacity="0.32"/>
+    <circle cx="627" cy="50" r="1.4" opacity="0.2"/>
+    <circle cx="714" cy="262" r="1.5" opacity="0.26"/>
+    <circle cx="806" cy="88" r="1.8" opacity="0.31"/>
+    <circle cx="884" cy="290" r="1.2" opacity="0.18"/>
+    <circle cx="962" cy="60" r="1.4" opacity="0.25"/>
+    <circle cx="1042" cy="254" r="1.6" opacity="0.28"/>
+    <circle cx="1098" cy="112" r="1.3" opacity="0.21"/>
+    <circle cx="158" cy="196" r="1.2" opacity="0.18"/>
+    <circle cx="1124" cy="206" r="1.7" opacity="0.29"/>
+    <circle cx="352" cy="298" r="1.3" opacity="0.22"/>
+    <circle cx="1006" cy="180" r="1.2" opacity="0.19"/>
+  </g>
+
+  <!-- Viewfinder frame. Structure is cool-gray hairline; amber stays reserved for meters. -->
+  <g stroke="#453D34" stroke-width="2" fill="none" stroke-linecap="square">
+    <path d="M44 80V44h36"/>
+    <path d="M1120 44h36v36"/>
+    <path d="M44 240v36h36"/>
+    <path d="M1156 240v36h-36"/>
+  </g>
+
+  <!-- The product mark: the favicon geometry at 4.6x. Corner brackets, crosshair, instrument dot. -->
+  <g transform="translate(100 86) scale(4.6)">
+    <g stroke="#E29C2F" fill="none" stroke-linecap="square">
+      <path d="M7 12V7h5" stroke-width="2"/>
+      <path d="M25 20v5h-5" stroke-width="2"/>
+      <path d="M16 8v3.5M16 20.5V24M8 16h3.5M20.5 16H24" stroke-width="1.5" opacity=".72"/>
+    </g>
+    <circle cx="16" cy="16" r="3" fill="#E29C2F"/>
+  </g>
+
+  <text x="310" y="178" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="82" font-weight="800" letter-spacing="-2" fill="#F2EDE7">Spark<tspan fill="#E29C2F">To</tspan>Comfy</text>
+  <text x="314" y="221" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="6.5" fill="#E29C2F">COMFYUI GENERATION CONSOLE</text>
+
+  <!-- Instrument scale. The lit tick is a reading, the only second use of amber. -->
+  <g stroke="#3B342C" stroke-width="1.5" stroke-linecap="square">
+    <path d="M310 252h794"/>
+    <path d="M310 252V242M352 252V247M394 252V247M436 252V247M478 252V242M520 252V247M562 252V247M604 252V247M646 252V242M688 252V247M730 252V247M772 252V247M814 252V242M856 252V247M898 252V247M940 252V247M982 252V242M1024 252V247M1066 252V247"/>
+  </g>
+  <path d="M646 252V234" stroke="#E29C2F" stroke-width="2.5" stroke-linecap="square"/>
+</svg>

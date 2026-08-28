@@ -1,0 +1,9 @@
+# The registry. Every workflow the panel offers is listed here, and nothing else makes one appear.
+# The panel reads config/workflow.yaml, so copy this file to that name before the first run.
+# `name` is what the operator sees in the workflow selector; the two paths are relative to the project root.
+# Several workflows may share one graph and differ only in their parameter file, so `workflow` may repeat where `parameter` does not.
+workflows:
+    example:
+        name: Example
+        parameter: config/parameter/example.yaml
+        workflow: config/workflow/example.json

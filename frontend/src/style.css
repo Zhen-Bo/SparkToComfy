@@ -1,0 +1,265 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+    Theme system: five colorways, with --amber as the instrument accent slot that every theme overrides.
+    The semantic layer (--background and the rest) is defined once and refers to the palette variables,
+    so switching a theme flips everything at once.
+  */
+  :root {
+    /* Default theme, NIGHT AMBER: a neutral warm black ground where amber glows with no other colour competing.
+       Structural rules: surfaces step by 4 to 5 lightness points and the darks stay warm.
+       A structural line must be visible, at least 1.35:1 against the surface it encloses, without brightening into a grid,
+       so hairline stays at or below 1.6:1 against plate.
+       A control border is a different thing: WCAG 1.4.11 wants 3:1 and neither hairline nor edgeline reaches it,
+       hence the separate --control level at 3:1 or better against dome, plate, elevated and inset.
+       Dividers use hairline at full strength, roughly 1.7:1 against inset, rather than being weakened with alpha.
+       A divider as bright as the column frame makes every line in the room weigh the same.
+       A group divider is the point of the grouping and needs another half step; see the note on the group border in ParameterPanel. */
+    --dome: 30 14% 5%;
+    --plate: 30 12% 12%;
+    --elevated: 28 11% 17%;
+    --inset: 32 14% 8%;
+    --hairline: 28 10% 22%;
+    --edgeline: 27 10% 31%;
+    /* The control border level: the identifying edge of an input, dropdown, button or selectable row.
+       Structural lines still use hairline. */
+    --control: 28 10% 47%;
+    --amber: 34 78% 55%;
+    --amber-bright: 38 88% 70%;
+    --amber-dim: 34 45% 30%;
+    --plate-bg: 28 16% 7%;
+    --ink-faint: 30 8% 57%;
+    --glow: 34 78% 55%;
+    --stars-opacity: 0.8;
+    --overlay: 30 14% 3%;
+    --ease-fluid: cubic-bezier(.22, 1, .36, 1);
+    --inset-shadow: inset 0 2px 7px rgba(0, 0, 0, .42), inset 0 1px 2px rgba(0, 0, 0, .5);
+
+    /* shadcn semantic mapping — resolved per theme */
+    --background: var(--dome);
+    --foreground: 36 20% 93%;
+    --card: var(--plate);
+    --card-foreground: var(--foreground);
+    --popover: var(--elevated);
+    --popover-foreground: var(--foreground);
+    --primary: var(--amber);
+    --primary-foreground: 30 60% 8%;
+    --secondary: var(--elevated);
+    --secondary-foreground: var(--foreground);
+    --muted: var(--plate);
+    --muted-foreground: 32 12% 68%;
+    --accent: var(--elevated);
+    --accent-foreground: var(--foreground);
+    /* destructive is a theme slot too: a bright red on the dark themes, at least 4.5:1 over elevated,
+       and a deep red on daylight, at least 4.5:1 over white. */
+    --destructive: 8 75% 62%;
+    --destructive-foreground: 0 0% 98%;
+    --border: var(--hairline);
+    --input: var(--hairline);
+    --ring: var(--amber);
+    --radius: 6px;
+  }
+
+  [data-theme='emerald'] {
+    --dome: 210 14% 5%; --plate: 210 12% 12%; --elevated: 208 11% 17%; --inset: 212 14% 8%;
+    --hairline: 210 8% 22%; --edgeline: 208 9% 31%; --control: 210 8% 47%;
+    --amber: 158 51% 48%; --amber-bright: 155 57% 64%; --amber-dim: 156 50% 24%;
+    --plate-bg: 210 18% 7%; --ink-faint: 160 5% 57%; --glow: 158 51% 48%;
+    --foreground: 165 12% 94%; --muted-foreground: 160 8% 69%; --primary-foreground: 148 55% 6%;
+    --destructive: 8 75% 62%;
+  }
+
+  [data-theme='safelight'] {
+    --dome: 12 18% 4%; --plate: 12 15% 12%; --elevated: 12 13% 17%; --inset: 10 18% 8%;
+    --hairline: 11 12% 21%; --edgeline: 12 14% 30%; --control: 11 12% 47%;
+    --amber: 8 70% 59%; --amber-bright: 9 80% 71%; --amber-dim: 6 49% 32%;
+    --plate-bg: 9 28% 6%; --ink-faint: 20 13% 56%; --glow: 8 70% 59%;
+    --foreground: 19 42% 93%; --muted-foreground: 19 22% 71%; --primary-foreground: 8 58% 7%;
+    --destructive: 8 75% 62%;
+  }
+
+  [data-theme='daylight'] {
+    /* A warm paper ground with a vermilion instrument scale.
+       The accent carries the main action and the connected readout, so it has to clear AA at 4.5:1 over --dome,
+       which a blue cannot do at this lightness. */
+    --dome: 32 68% 95%; --plate: 30 100% 98%; --elevated: 0 0% 100%; --inset: 33 45% 91%;
+    --hairline: 33 25% 81%; --edgeline: 33 17% 68%; --control: 34 10% 50%;
+    --amber: 10 76% 43%; --amber-bright: 10 66% 36%; --amber-dim: 11 73% 80%;
+    /* The image well follows the paper ground here.
+       A dark surround judges an image more accurately,
+       but on a light theme it puts a block of black in a room that has none. */
+    --plate-bg: 32 55% 92%; --ink-faint: 30 9% 42%; --glow: 10 76% 43%;
+    --stars-opacity: 0;
+    --inset-shadow: inset 0 1px 3px hsl(33 20% 20% / .09);
+    --foreground: 33 16% 11%; --muted-foreground: 30 11% 33%; --primary-foreground: 30 100% 98%;
+    --destructive: 358 65% 42%;
+  }
+
+  [data-theme='ops'] {
+    --dome: 220 26% 4%; --plate: 219 22% 12%; --elevated: 218 18% 17%; --inset: 221 24% 8%;
+    --hairline: 217 14% 22%; --edgeline: 216 13% 31%; --control: 217 14% 47%;
+    --amber: 22 76% 52%; --amber-bright: 23 88% 65%; --amber-dim: 23 60% 30%;
+    --plate-bg: 215 43% 6%; --ink-faint: 216 17% 57%; --glow: 22 76% 52%;
+    --foreground: 215 43% 95%; --muted-foreground: 216 23% 72%; --primary-foreground: 27 87% 6%;
+    --destructive: 8 75% 62%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  :root {
+    color-scheme: dark; /* native scrollbars and form controls follow the dark themes */
+  }
+  [data-theme='daylight'] {
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-size: 14px;
+    overflow: hidden;
+    caret-color: hsl(var(--amber));
+    -webkit-font-smoothing: antialiased;
+    transition: background-color .25s, color .25s;
+    /* One path, the standard property.
+       ::-webkit-scrollbar stops working entirely once scrollbar-color is anything but auto, so keeping it would be dead code.
+       The thumb uses --control to clear the 3:1 of WCAG 1.4.11. */
+    scrollbar-color: hsl(var(--control)) hsl(var(--dome));
+    scrollbar-width: thin;
+    /* The :active scale is the deliberate tap feedback, so the default grey tap highlight is turned off. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* The /playground overview is a long page, so document scrolling is restored.
+     The workspace stays app-style with overflow:hidden and each column scrolls itself. */
+  html[data-route='playground'] body {
+    overflow: auto;
+  }
+  ::selection {
+    background: hsl(var(--amber));
+    color: hsl(var(--primary-foreground));
+  }
+  :focus-visible {
+    outline: 1.5px solid hsl(var(--amber));
+    outline-offset: 2px;
+  }
+  /* Preview SVGs fill their host container so preserveAspectRatio, slice or meet, takes effect.
+     Without this rule an svg with no width or height attribute resolves height from the viewBox ratio,
+     overflows the container and gets clipped. */
+  .art { width: 100%; height: 100%; display: block; }
+}
+
+@layer components {
+  /* The observatory frame mark. */
+  .obs-corners { position: relative; }
+  .obs-corners::before,
+  .obs-corners::after {
+    content: ''; position: absolute; width: 12px; height: 12px; pointer-events: none; z-index: 6;
+  }
+  .obs-corners::before {
+    top: -1px; left: -1px;
+    border-top: 1.5px solid hsl(var(--amber) / .7);
+    border-left: 1.5px solid hsl(var(--amber) / .7);
+  }
+  .obs-corners::after {
+    bottom: -1px; right: -1px;
+    border-bottom: 1.5px solid hsl(var(--amber) / .7);
+    border-right: 1.5px solid hsl(var(--amber) / .7);
+  }
+
+  .obs-label {
+    @apply flex items-baseline gap-2.5 mb-2;
+    font-family: 'Taipei Sans TC', sans-serif;
+    font-size: 13.5px; font-weight: 700; letter-spacing: .1em;
+    color: hsl(var(--foreground));
+  }
+  .obs-label::after {
+    /* The rule extending from the label is the group divider.
+       At 1px it breaks up and disappears on a real screen at this lightness step, on an uncalibrated display or in a narrow window,
+       so it buys presence with 2px of thickness.
+       The colour stops at edgeline: no new element and no amber. */
+    content: ''; flex: 1; height: 2px; background: hsl(var(--edgeline));
+    /* The parent is items-baseline, so the rule would sit on the text baseline and read as too low.
+       A group divider should align with the visual centre of the text. */
+    align-self: center;
+  }
+
+  .obs-hint {
+    /* The type floor is 11px.
+       At 10.5px it is hard work on an ordinary screen, neither calibrated nor high-DPI,
+       and this is a shared machine console read at a distance: a readout nobody can read is not a readout. */
+    font-family: 'Chivo Mono', 'Taipei Sans TC', monospace;
+    font-size: 11px; letter-spacing: .03em;
+    color: hsl(var(--ink-faint));
+    margin-top: 6px;
+  }
+
+  /* The gradient stops at 3%.
+     Any deeper and the foot of the column sinks back into the ground colour.
+     The top highlight is how anodised metal reads. */
+  .obs-panel {
+    background: linear-gradient(180deg, hsl(var(--plate)), color-mix(in srgb, hsl(var(--plate)) 97%, black));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / .035);
+  }
+  .obs-elevated {
+    background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 97%, black));
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05);
+  }
+  /* The translucent plate, used only by the viewer chrome: the caption row, the parameters, the chips and the navigation dock.
+     It covers the image as little as possible and the picture still shows faintly through.
+     Opacity is the only variable that can guarantee contrast over an arbitrary image,
+     and 88% is the level that clears AA on all five themes over the worst case, a white image.
+     ink-faint stays below AA on this ground, so the viewer chrome never uses it. */
+  .obs-ghost {
+    background: hsl(var(--elevated) / .88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  /* While dragging or pinching, the image transforms every frame and backdrop-filter would resample and reblur on each one,
+     so it is turned off for the gesture.
+     The 88% ground carries readability on its own, and the blur returns on release. */
+  .bd-off .obs-ghost {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .obs-inset {
+    background: hsl(var(--inset));
+    box-shadow: var(--inset-shadow);
+  }
+
+  /* Global film grain, which breaks up the flat digital fill.
+     It is fixed and pointer-events-none, so it never triggers a repaint. */
+  .obs-grain::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 70; pointer-events: none;
+    opacity: .028;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* One transition for every interactive element: colour, border and transform only.
+     transition: all is banned. */
+  .obs-tr {
+    transition:
+      color .2s var(--ease-fluid),
+      background-color .2s var(--ease-fluid),
+      border-color .2s var(--ease-fluid),
+      transform .2s var(--ease-fluid),
+      box-shadow .2s var(--ease-fluid);
+  }
+
+  /* Reduced motion: transitions collapse to nearly instant while the state changes stay, so no feedback is destroyed.
+     The two animations that carry state meaning, the queue slot blink and the upscale scan line,
+     are slowed fourfold rather than killed, so the change stays readable. */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      transition-duration: .01ms !important;
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+    .qs-slots i.you, .qs-slots i.on, .qs-slots.rdy::after, .cline.rdy, .upscan-line {
+      animation-duration: 4s !important;
+      animation-iteration-count: infinite !important;
+    }
+  }
+}

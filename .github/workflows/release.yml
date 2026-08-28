@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  IMAGE: ghcr.io/zhen-bo/sparktocomfy
+
+jobs:
+  test:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          # Pre-release tags get no latest under the default auto rule, so force it.
+          flavor: latest=true
+
+      # The Dockerfile builds the Vue app in a node stage and copies dist/ into the runtime image.
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      # Proves the image starts and serves the built UI, not just that the build succeeded.
+      # The image ships no config, so this mounts it the way docker-compose does and copies the registry the way the quick start does.
+      - name: Smoke test
+        run: |
+          cp config/workflow.example.yaml config/workflow.yaml
+          docker run -d --name smoke -p 8000:8000 -v "$PWD/config:/app/config:ro" "$IMAGE@${{ steps.build.outputs.digest }}"
+          for _ in $(seq 30); do
+            curl -fsS -o page.html http://127.0.0.1:8000/ && break || sleep 2
+          done
+          docker logs smoke
+          grep -q '/assets/index-' page.html
+
+      # GitHub refuses to store attestations for user-owned private repositories, so this step waits until the repository is public and then starts working on its own.
+      - if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

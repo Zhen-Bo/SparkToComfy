@@ -1,0 +1,40 @@
+# Size presets, shared by every workflow: a `size` control declares no presets of its own and is given these at load time.
+# Each ratio carries two resolutions, and the panel's landscape toggle swaps width and height rather than adding more entries.
+# `icon` picks the glyph the ratio button draws.
+presets:
+    square:
+        label: "1:1"
+        icon: square
+        standard:
+            width: 1536
+            height: 1536
+        highres:
+            width: 2048
+            height: 2048
+    poster:
+        label: "2:3"
+        icon: poster
+        standard:
+            width: 1024
+            height: 1536
+        highres:
+            width: 1280
+            height: 1920
+    photo:
+        label: "3:4"
+        icon: photo
+        standard:
+            width: 1152
+            height: 1536
+        highres:
+            width: 1440
+            height: 1920
+    wallpaper:
+        label: "9:16"
+        icon: wallpaper
+        standard:
+            width: 864
+            height: 1536
+        highres:
+            width: 1080
+            height: 1920

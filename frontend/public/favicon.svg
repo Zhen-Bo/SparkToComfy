@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    SparkToComfy mark, built from the interface itself rather than a generic symbol:
+    the viewfinder corner brackets (.obs-corners), the stage crosshair and the amber
+    instrument dot. Pure geometry, so the brackets and the centre dot stay readable
+    at small sizes.
+  -->
+  <rect width="32" height="32" rx="5" fill="#100D0B"/>
+  <g stroke="#E29C2F" stroke-width="2" fill="none" stroke-linecap="square">
+    <!-- Corner brackets, top left and bottom right, the diagonal pairing of .obs-corners -->
+    <path d="M7 12V7h5"/>
+    <path d="M25 20v5h-5"/>
+    <!-- Crosshair, left open at the centre for the instrument dot -->
+    <path d="M16 8v3.5M16 20.5V24M8 16h3.5M20.5 16H24" stroke-width="1.6" opacity=".55"/>
+  </g>
+  <circle cx="16" cy="16" r="3" fill="#E29C2F"/>
+</svg>

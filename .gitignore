@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.env
+*.db
+*.db-wal
+*.db-shm
+data/
+.pytest_cache/
+.smell-check/
+node_modules/
+dist/
+
+# The panel reads config/workflow.yaml, config/parameter/*.yaml and config/workflow/*.json.
+# Only the example set is shipped; a real deployment's own workflows stay on its own machine.
+config/workflow.yaml
+config/parameter/*.yaml
+!config/parameter/example.yaml
+config/workflow/*.json
+!config/workflow/example.json

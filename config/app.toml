@@ -1,0 +1,16 @@
+[server]
+host = "0.0.0.0"                # use "127.0.0.1" to keep it on this machine only
+port = 8000
+database = "data/comfypanel.db" # relative to the repo root; an absolute path also works
+docs = false                    # set true to open /docs /redoc /openapi.json while developing
+
+[comfyui]
+url = "http://127.0.0.1:8188"   # deployment example: http://10.10.10.2:8188
+
+[eta]
+upscale_seconds_per_megapixel = 0.7  # upscale surcharge factor; calibrate per GPU
+
+[rate_limit]
+enabled = false      # off by default
+window_minutes = 60  # sliding window length
+max_generations = 20 # accepted generations per IP inside the window

@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  # GitHub Flow merges through pull requests, so the checks have to run on the pull request itself.
+  # On main they are the backstop against a direct push.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A newer push makes the running check pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/test.yml

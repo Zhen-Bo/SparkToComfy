@@ -1,0 +1,38 @@
+name: Test
+
+# Called by ci.yml on every push to main and by release.yml before it builds the image, so both gates run the exact same checks.
+on:
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # setup-uv publishes no floating major tag, so the exact version is the only thing that resolves.
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          cache-python: true
+
+      # --locked fails when uv.lock drifted from pyproject.toml instead of quietly relocking.
+      - run: uv sync --locked
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      # app.main only mounts the SPA routes when frontend/dist exists, so the test that covers the /v1 mount against the catch-all needs a real build to run against.
+      # It also means a broken frontend fails here instead of at release time.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+      # The e2e marker needs a real ComfyUI on 8188; pyproject already deselects it.
+      - run: uv run pytest -q

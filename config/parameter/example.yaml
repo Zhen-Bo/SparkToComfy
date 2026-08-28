@@ -1,0 +1,179 @@
+# One workflow's parameter form: what the panel shows, and where each value lands in the graph.
+# This is the shipped example. Copy it, register the copy, and edit; nothing here is special-cased.
+#
+# Three files describe a workflow and refer to each other:
+#   config/workflow.yaml         the registry, which gives the workflow its id and points at the two files below
+#   config/parameter/<id>.yaml   this file
+#   config/workflow/<name>.json  the graph, exported from ComfyUI with "Export (API)"
+#
+# Two keys appear on almost every control:
+#   node     a key in the exported JSON. Open the file and read the ids; they are strings, so quote them.
+#   target   a key inside that node's own "inputs" object. It is a literal name, never a path: node 20744 really does have an input called "resize_type.scale".
+#
+# Editing this file needs no restart. The catalog reloads every 30 seconds, and a file that fails to load keeps the previous version and logs why.
+#
+# Every model, LoRA, sampler and scheduler named below is a name the machine this example
+# was written on happens to have. Yours will differ, and a name ComfyUI does not know makes
+# it reject the whole prompt. Ask your own instance what it has:
+#   curl -s localhost:8188/object_info/UNETLoader           | jq '..|.unet_name?//empty|.[0]'
+#   curl -s localhost:8188/object_info/LoraLoaderModelOnly  | jq '..|.lora_name?//empty|.[0]'
+#   curl -s localhost:8188/object_info/KSampler             | jq '..|.sampler_name?//empty|.[0]'
+
+# Values written straight into the graph, with no control on screen.
+# Use this for anything the operator must not change.
+hidden:
+    clip:
+        node: "20735:6198"
+        target: clip_name
+        value: qwen3vl_4b_fp8_scaled.safetensors
+    clip_type:
+        node: "20735:6198"
+        target: type
+        value: krea2
+    trigger_message:
+        node: "20738"
+        target: orinalMessage
+        value: ""
+    trigger_words:
+        node: "20738"
+        target: toggle_trigger_words
+        value: { __value__: [] }
+    filename:
+        node: "20745"
+        target: filename_prefix
+        value: API/%date:yyyy-MM-dd-hh-mm-ss%-%seed%-%model%
+
+# The two tabs of the panel. Every control here is submitted by the operator and validated
+# server-side; a name the form does not declare is rejected.
+basic:
+    # dropdown — a fixed list of choices.
+    # An option is either `key: Label` or a table, which is what lets one be greyed out.
+    # A disabled option is refused server-side too, not only hidden in the UI.
+    model:
+        node: "20735:6196"
+        target: unet_name
+        type: dropdown
+        options:
+            krea2Turbo_v10_fp8.safetensors:
+                label: Krea2 Turbo FP8
+            krea2Turbo_v10_bf16.safetensors:
+                label: Krea2 Turbo
+                disabled: true
+        default: krea2Turbo_v10_fp8.safetensors
+
+    # multiline — a text area. max_length is enforced on the server, so raising it here is what raises the real limit.
+    quality:
+        node: "20739"
+        target: positive
+        type: multiline
+        max_length: 500
+        default: "masterpiece, best quality, very aesthetic, ultra-detailed"
+    positive:
+        node: "20740"
+        target: positive
+        type: multiline
+        max_length: 3000
+        default: ""
+    negative:
+        node: "20741"
+        target: negative
+        type: multiline
+        max_length: 500
+        default: ""
+
+    # size — the ratio picker. The presets come from config/size.yaml and are shared by every workflow, which is why none are listed here.
+    # It patches width and height together, so the node needs both inputs.
+    size:
+        node: "20755"
+        type: size
+
+advanced:
+    # input — one number. value_kind is int or float and decides what the server accepts; min and max are enforced there as well.
+    # display and step only tell the frontend how to draw it.
+    steps:
+        node: "20742"
+        target: steps
+        type: input
+        value_kind: int
+        display: slider
+        min: 1
+        max: 50
+        step: 1
+        default: 8
+    cfg:
+        node: "20742"
+        target: cfg
+        type: input
+        value_kind: float
+        display: slider
+        min: 0
+        max: 7
+        step: 0.1
+        default: 1.0
+
+    # seed — an integer, or -1 for "roll a new one on every run".
+    seed:
+        node: "20742"
+        target: seed
+        type: seed
+        default: -1
+    sampler:
+        node: "20742"
+        target: sampler_name
+        type: dropdown
+        options:
+            euler: Euler
+            euler_ancestral: Euler a
+            dpmpp_2m: DPM++ 2M
+            dpmpp_2m_sde: DPM++ 2M SDE
+            dpmpp_3m_sde: DPM++ 3M SDE
+        default: euler_ancestral
+    scheduler:
+        node: "20742"
+        target: scheduler
+        type: dropdown
+        options:
+            normal: Normal
+            simple: Simple
+            beta: Beta
+        default: beta
+
+    # bypass — skip part of the graph when the control sits at a chosen value.
+    # At scale 1 there is nothing to upscale, so instead of running the upscaler on an unchanged image, node 20753's "anything" input is rewired to output slot 0 of node 20743 and the upscaler is left out of the run.
+    # Any control may carry a bypass block; it is not tied to the input type.
+    upscale:
+        node: "20744"
+        target: resize_type.scale
+        type: input
+        value_kind: float
+        display: slider
+        min: 1
+        max: 2
+        step: 0.1
+        default: 1
+        bypass:
+            at: 1
+            rewire:
+                node: "20753"
+                input: anything
+                to:
+                    node: "20743"
+                    slot: 0
+
+    # lora — the picker, up to five entries, each with its own strength.
+    # The options below are private merges belonging to the author of this example; swap in whatever your own instance reports.
+    # The node must be a Lora Loader (LoraManager) from ComfyUI-Lora-Manager: the panel writes the `<lora:name:strength>` syntax that node reads, and cover art comes from the same add-on's API.
+    # Drop this control and the workflow needs neither the node nor the add-on.
+    # Option keys are file names as Lora Manager reports them, without the .safetensors suffix.
+    lora:
+        node: "20737"
+        type: lora
+        strength:
+            min: 0
+            max: 2
+            step: 0.05
+            default: 1
+        options:
+            Ps_Special_Merge_for_Krea2-v1: Ps Special Merge Style
+            Ps_gpt2-style_v3-krea2: Ps GPT-image-2 style
+            Krea2_TextFusion_Refusal_Reduction: TextFusion Refusal-Reduction

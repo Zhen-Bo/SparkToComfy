@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: ghcr.io/zhen-bo/sparktocomfy:latest
+    container_name: comfypanel
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SERVER__HOST: 0.0.0.0
+      SERVER__PORT: "8000"
+      SERVER__DATABASE: /app/data/comfypanel.db
+      COMFYUI__URL: http://host.docker.internal:8188
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./config:/app/config:ro
+      - comfypanel-data:/app/data
+
+volumes:
+  comfypanel-data:
