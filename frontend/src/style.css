@@ -92,6 +92,9 @@
        A dark surround judges an image more accurately,
        but on a light theme it puts a block of black in a room that has none. */
     --plate-bg: 32 55% 92%; --ink-faint: 30 9% 42%; --glow: 10 76% 43%;
+    /* The viewer scrim dims the room rather than replacing it: the near-black of the dark themes would drop a hole into a paper world.
+       It still has to isolate the evidence, so it stays deep enough to hold 10:1 against a white image while the workspace behind falls back to 2:1. */
+    --overlay: 32 30% 26%;
     --stars-opacity: 0;
     --inset-shadow: inset 0 1px 3px hsl(33 20% 20% / .09);
     --foreground: 33 16% 11%; --muted-foreground: 30 11% 33%; --primary-foreground: 30 100% 98%;
@@ -206,19 +209,19 @@
     background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 97%, black));
     box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05);
   }
-  /* The translucent plate, used only by the viewer chrome: the caption row, the parameters, the chips and the navigation dock.
+  /* The translucent plate, used only by the viewer chrome: the key hints, the parameters and the navigation dock.
      It covers the image as little as possible and the picture still shows faintly through.
-     Opacity is the only variable that can guarantee contrast over an arbitrary image,
-     and 88% is the level that clears AA on all five themes over the worst case, a white image.
+     Opacity is the only variable that can guarantee contrast over an arbitrary image.
+     92% is the floor that keeps muted-foreground at or above 4.5:1 on all five themes over both extremes, a white image and a black one; the tightest is amber over white at 4.99:1.
      ink-faint stays below AA on this ground, so the viewer chrome never uses it. */
   .obs-ghost {
-    background: hsl(var(--elevated) / .88);
+    background: hsl(var(--elevated) / .92);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
   /* While dragging or pinching, the image transforms every frame and backdrop-filter would resample and reblur on each one,
      so it is turned off for the gesture.
-     The 88% ground carries readability on its own, and the blur returns on release. */
+     The 92% ground carries readability on its own, and the blur returns on release. */
   .bd-off .obs-ghost {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;

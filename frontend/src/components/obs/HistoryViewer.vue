@@ -7,8 +7,8 @@
    - opening or switching fits the image (scale = minScale), the ceiling is 400% and the zoom factor is never displayed
    - left and right always switch images; panning is a drag once zoomed in, or Shift plus an arrow key; there are solid edge buttons plus the bottom dock
    - switching is a directional slide and cross-fade through a keyed remount inside a <Transition>, so the fit reset never runs through a transform transition and nothing jumps
-   - the caption row stays minimal (wheel to zoom, 0 to reset, ESC to close), with no detailed mode and no count; the parameter panel is collapsed by default below it
-   - the caption row, parameters and dock are translucent (.obs-ghost); restoring takes every parameter; a resize recomputes the floor */
+   - the key hints and the parameter panel share one 264px column at the top left: one surface, one width, one left edge, with the panel collapsed by default
+   - the column and the dock are translucent (.obs-ghost); restoring takes every parameter; a resize recomputes the floor */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useModalLayer } from '@/lib/useModalLayer'
 import { useCopyImage } from '@/lib/useCopyImage'
@@ -17,7 +17,7 @@ import { useI18n } from 'vue-i18n'
 import { sizeOf } from '@/stores/catalog'
 import { restoreFromHistory, timeOf } from '@/stores/history'
 import { locked } from '@/stores/run'
-import { PhX, PhArrowSquareIn, PhCaretLeft, PhCaretRight } from '@phosphor-icons/vue'
+import { PhX, PhArrowSquareIn, PhCaretLeft, PhCaretRight, PhImageBroken } from '@phosphor-icons/vue'
 import ViewerDock from '@/components/obs/ViewerDock.vue'
 import ViewerParams from '@/components/obs/ViewerParams.vue'
 
@@ -28,9 +28,6 @@ const props = defineProps({
   startIndex: { type: Number, default: 0 },
 })
 const emit = defineEmits(['close'])
-
-// How far the previous button steps aside when the parameter panel is open: the panel sits at left-5 and is 264px wide, so its right edge is at 284px, plus a 16px gap.
-const PANEL_CLEAR = 280
 
 const idx = ref(props.startIndex)
 const paramsOpen = ref(false)
@@ -44,14 +41,24 @@ const p = computed(() => entry.value.params)
 
 /* The size has two uses with different sources.
    The readout must be honest: an unknown preset shows a dash rather than an invented 1x1.
-   The geometry still needs something to draw with, so it falls back to the natural size of the image file (DESIGN.md: the aspect ratio comes from the file). */
+   The geometry comes from the file (DESIGN.md: the aspect ratio comes from the file). The preset is the reservation that draws the box before the image arrives, so the evidence never shifts, and the file takes over as it loads. */
 const shownDims = computed(() => sizeOf(entry.value.workflowId, p.value.size))
 const natural = ref(null)
-const dims = computed(() => shownDims.value ?? natural.value ?? { width: 1, height: 1 })
+const dims = computed(() => natural.value ?? shownDims.value ?? { width: 1, height: 1 })
 function onImgLoad(e) {
   const { naturalWidth: w, naturalHeight: h } = e.target
-  if (w && h) natural.value = { width: w, height: h }
+  if (!w || !h) return
+  const reservedWrongRatio = Math.abs(dims.value.width / dims.value.height - w / h) > 1e-3
+  natural.value = { width: w, height: h }
+  if (reservedWrongRatio) fitToStage() // the frame just changed shape, so the fit has to be taken again
 }
+
+/* A history entry can outlive its file: the record stays in the database after ComfyUI's output is cleared.
+   The frame then keeps the preset shape and states the failure, the same rule the LoRA covers follow, so the browser never draws a broken-image icon.
+   An entry that carries no image at all takes the same path, because there is no file to point the image element at. */
+const failed = ref(false)
+const src = computed(() => entry.value.images?.[0] ?? null)
+const showImage = computed(() => !!src.value && !failed.value)
 
 const {
   scale, dragging, pinching, gesturing, frameStyle, transform,
@@ -59,19 +66,22 @@ const {
 } = useZoomPan(dims)
 
 const { toClipboard } = useCopyImage()
-const copyImage = () => toClipboard(entry.value.images[0])
+const copyImage = () => { if (showImage.value) toClipboard(src.value) } // nothing to put on the clipboard when the file is gone
 
 /** Left and right always switch.
  * A switch resets to fit and plays the directional slide. */
 function go(d) {
   slideDir.value = d
+  natural.value = null // the next file reserves from its own preset, then corrects itself on load
+  failed.value = false
   idx.value = (idx.value + d + props.entries.length) % props.entries.length
   fitToStage()
 }
 
-/** Focus loop: Tab stays inside the overlay, cycling between the first and last button, a second guard beside inert. */
+/** Focus loop: Tab stays inside the overlay, cycling between its first and last stop, a second guard beside inert.
+ * The scrollable parameter list is a stop too, not only the buttons, so it cannot fall outside the loop. */
 function cycleFocus(e) {
-  const els = viewerRoot.value?.querySelectorAll('button:not([disabled])') ?? []
+  const els = viewerRoot.value?.querySelectorAll('button:not([disabled]), [tabindex="0"]') ?? []
   if (!els.length) return
   const active = document.activeElement
   const inside = viewerRoot.value?.contains(active)
@@ -148,6 +158,45 @@ function backfill() {
 
       <div class="sr-only" aria-live="polite">{{ t('viewer.counter', { n: idx + 1, total: entries.length }) }}</div>
 
+      <!-- Source order is reading order, so Tab follows the screen: the top-left column, the top-right actions,
+           then the stage arrows, then the dock at the bottom. Stacking is set by z-index, not by this order. -->
+      <!-- Top left: one column at one width, holding the key hints and then the parameter panel, collapsed by default.
+           The hints carry only what the screen cannot show by itself: the wheel and the copy key. Switching, panning and closing each have their own visible cue.
+           max-height keeps the column one gap clear of the previous button: 50vh is the button's centre, less half its 44px height, less the 16px gap, less the 20px top margin. -->
+      <div
+        class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex w-[264px] flex-col border border-hairline"
+        style="max-height: calc(50vh - 58px)"
+      >
+        <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 border-b border-hairline px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
+          <span class="whitespace-nowrap">{{ t('viewer.hintWheel') }}</span>
+          <span class="whitespace-nowrap">{{ t('viewer.hintCopy') }}</span>
+        </div>
+
+        <ViewerParams v-model="paramsOpen" :params="p" :shown-dims="shownDims" />
+      </div>
+
+      <div class="absolute right-5 top-5 z-20 flex flex-col gap-2.5">
+        <!-- Close is a leaving action, so hover only brightens it neutrally.
+             Amber is reserved for the CTA, the active state and readouts -->
+        <button
+          ref="closeBtn"
+          type="button"
+          :title="t('viewer.close')"
+          :aria-label="t('viewer.close')"
+          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:shadow-[inset_0_0_0_999px_hsl(var(--foreground)/.12)] active:scale-95"
+          @click="emit('close')"
+        ><PhX class="h-[18px] w-[18px]" aria-hidden="true" /></button>
+        <button
+          type="button"
+          :title="t('viewer.backfill')"
+          :aria-label="t('viewer.backfill')"
+          :aria-disabled="locked || undefined"
+          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-amber text-[hsl(var(--primary-foreground))] shadow-[0_2px_10px_hsl(var(--amber)/.3)] active:scale-95"
+          :class="locked ? 'cursor-not-allowed opacity-40 shadow-none' : 'hover:bg-amber-bright'"
+          @click="backfill"
+        ><PhArrowSquareIn class="h-[18px] w-[18px]" aria-hidden="true" /></button>
+      </div>
+
       <!-- Stage: full bleed, with the margins on all four sides handled by the fit maths.
            A click anywhere outside the image closes it -->
       <div
@@ -175,12 +224,24 @@ function backfill() {
               @lostpointercapture="onPointerUp"
             >
               <img
-                :src="entry.images[0]"
+                v-if="showImage"
+                :src="src"
                 class="h-full w-full border border-hairline bg-plate-bg object-contain"
                 :alt="t('viewer.imgAlt', { n: idx + 1, width: dims.width, height: dims.height })"
                 draggable="false"
                 @load="onImgLoad"
+                @error="failed = true"
               />
+              <!-- The frame keeps the preset shape so the surrounding layout does not move, and says what happened instead of showing an empty box -->
+              <div
+                v-else
+                class="flex h-full w-full flex-col items-center justify-center gap-3 border border-hairline bg-plate-bg px-6 text-center"
+                role="img"
+                :aria-label="t('errors.image_load_failed')"
+              >
+                <PhImageBroken class="h-10 w-10 text-ink-faint" aria-hidden="true" />
+                <p class="text-[13px] text-muted-foreground">{{ t('errors.image_load_failed') }}</p>
+              </div>
             </div>
           </div>
         </Transition>
@@ -189,8 +250,7 @@ function backfill() {
           type="button"
           :title="t('viewer.prevTitle')"
           :aria-label="t('viewer.prev')"
-          class="nav-edge obs-tr absolute left-5 top-1/2 z-20 flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
-          :style="{ transform: 'translateY(-50%) translateX(' + (paramsOpen ? PANEL_CLEAR : 0) + 'px)' }"
+          class="obs-tr absolute left-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
           @click.stop="go(-1)"
         ><PhCaretLeft class="h-[18px] w-[18px]" aria-hidden="true" /></button>
         <button
@@ -209,43 +269,6 @@ function backfill() {
         @go="go"
         @close="emit('close')"
       />
-
-      <!-- Top left: the minimal caption row (wheel, 0, Ctrl+C, ESC) plus the parameter panel, pinned below it and collapsed by default -->
-      <div class="pointer-events-none absolute left-5 top-5 z-20 flex flex-col items-start gap-3">
-        <div class="obs-ghost pointer-events-auto flex items-center gap-3 whitespace-nowrap border border-hairline px-4 py-2 font-mono text-[12px] text-foreground">
-          <span>{{ t('viewer.hintWheel') }}</span>
-          <span class="text-muted-foreground">・</span>
-          <span>{{ t('viewer.hintReset') }}</span>
-          <span class="text-muted-foreground">・</span>
-          <span>{{ t('viewer.hintCopy') }}</span>
-          <span class="text-muted-foreground">・</span>
-          <span>{{ t('viewer.hintClose') }}</span>
-        </div>
-
-        <ViewerParams v-model="paramsOpen" :params="p" :shown-dims="shownDims" />
-      </div>
-
-      <div class="absolute right-5 top-5 z-20 flex flex-col gap-2.5">
-        <!-- Close is a leaving action, so hover only brightens it neutrally.
-             Amber is reserved for the CTA, the active state and readouts -->
-        <button
-          ref="closeBtn"
-          type="button"
-          :title="t('viewer.close')"
-          :aria-label="t('viewer.close')"
-          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:shadow-[inset_0_0_0_999px_hsl(var(--foreground)/.12)] active:scale-95"
-          @click="emit('close')"
-        ><PhX class="h-[18px] w-[18px]" aria-hidden="true" /></button>
-        <button
-          type="button"
-          :title="t('viewer.backfill')"
-          :aria-label="t('viewer.backfill')"
-          :aria-disabled="locked || undefined"
-          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-amber text-[hsl(var(--primary-foreground))] shadow-[0_2px_10px_hsl(var(--amber)/.3)] active:scale-95"
-          :class="locked ? 'cursor-not-allowed opacity-40 shadow-none' : 'hover:bg-amber-bright'"
-          @click="backfill"
-        ><PhArrowSquareIn class="h-[18px] w-[18px]" aria-hidden="true" /></button>
-      </div>
     </div>
   </Teleport>
 </template>
@@ -292,8 +315,4 @@ function backfill() {
 }
 .viewer-leave-active { animation: none; transition: opacity 140ms ease-out, transform 140ms ease-out; pointer-events: none; }
 .viewer-leave-to     { opacity: 0; transform: scale(.98); }
-
-/* The previous button steps aside with a transform only, so it runs on the compositor.
-   Reduced motion is collapsed to nearly instant by the global rule in style.css. */
-.nav-edge { transition: transform .18s var(--ease-fluid); }
 </style>

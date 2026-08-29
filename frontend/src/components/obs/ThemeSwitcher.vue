@@ -35,28 +35,23 @@ function closeMenu({ refocus = false } = {}) {
   open.value = false
   if (refocus) nextTick(() => triggerBtn.value?.focus())
 }
-/** Keys inside the menu: up/down move, Home/End jump, ESC closes and returns focus, Tab closes. */
-function onMenuKeydown(e) {
+function moveFocus(step) {
   const items = itemRefs.value
   const at = items.indexOf(document.activeElement)
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    return closeMenu({ refocus: true })
-  }
-  if (e.key === 'Tab') return closeMenu()
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault()
-    const d = e.key === 'ArrowDown' ? 1 : -1
-    items[(at + d + items.length) % items.length]?.focus()
-  }
-  if (e.key === 'Home') {
-    e.preventDefault()
-    items[0]?.focus()
-  }
-  if (e.key === 'End') {
-    e.preventDefault()
-    items[items.length - 1]?.focus()
-  }
+  items[(at + step + items.length) % items.length]?.focus()
+}
+/* Keys inside the menu, one entry each: up/down move, Home/End jump, ESC closes and returns focus, Tab closes.
+   Tab keeps its default so focus leaves the menu the normal way; every other key takes preventDefault. */
+const MENU_KEYS = {
+  Escape: (e) => { e.preventDefault(); closeMenu({ refocus: true }) },
+  Tab: () => closeMenu(),
+  ArrowDown: (e) => { e.preventDefault(); moveFocus(1) },
+  ArrowUp: (e) => { e.preventDefault(); moveFocus(-1) },
+  Home: (e) => { e.preventDefault(); itemRefs.value[0]?.focus() },
+  End: (e) => { e.preventDefault(); itemRefs.value.at(-1)?.focus() },
+}
+function onMenuKeydown(e) {
+  MENU_KEYS[e.key]?.(e)
 }
 function onDocClick(e) {
   if (root.value && !root.value.contains(e.target) && !e.target.closest('[data-theme-menu]')) closeMenu()

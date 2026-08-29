@@ -160,7 +160,7 @@ function onCancelClear() {
          The entry button is a direct child of the aside rather than of this layer, so a zero width does not clip it away too. -->
     <div class="absolute inset-0 overflow-hidden">
     <div
-      class="obs-panel absolute inset-y-0 right-0 flex w-[264px] flex-col overflow-hidden border-l border-hairline"
+      class="rail-panel obs-panel absolute inset-y-0 right-0 flex w-[264px] flex-col overflow-hidden border-l border-hairline"
       :inert="closed || undefined"
     >
       <!-- The header is the collapse control.
@@ -277,6 +277,12 @@ function onCancelClear() {
    Closing takes 180ms. */
 .rail { transition: width .22s var(--ease-fluid); }
 .rail-closed { transition-duration: .18s; }
+
+/* The column width is what animates, so every frame is a layout frame.
+   Without containment that layout descends into the panel and re-measures up to 50 cards, none of which can move:
+   the panel is a fixed 264px anchored to the right edge, and its inside does not depend on the column at all.
+   Containment states that, so a frame costs the panel's own box and nothing below it. */
+.rail-panel { contain: layout paint; }
 
 /* The entry button appears only once the panel is out of the way, after a .1s delay, and leaves immediately with no delay and a shorter duration.
    scale(.9) rather than scale(0): nothing in the real world grows out of nothing. */
