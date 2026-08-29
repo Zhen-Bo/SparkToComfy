@@ -7,6 +7,7 @@ A WorkflowCatalog holds the workflow declarations and a background task reloads 
 import json
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic_settings import SettingsConfigDict
@@ -28,6 +29,8 @@ class ServerSettings(TomlSettings):
     port: int
     database: str
     docs: bool
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+    log_format: Literal["console", "json"]
 
 
 SETTINGS = ServerSettings()  # pyright: ignore[reportCallIssue]  # values come from app.toml, not constructor arguments

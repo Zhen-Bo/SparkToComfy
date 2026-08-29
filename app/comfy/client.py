@@ -7,16 +7,16 @@ decides which HTTP status each one becomes.
 
 import asyncio
 import json
-import logging
 import struct
 from urllib.parse import quote, urlparse
 
 import httpx
+import structlog
 import websockets
 
 from app.comfy.config import SETTINGS
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 COMFY_URL = SETTINGS.url.rstrip("/")
 CLIENT_ID = "comfypanel-backend"
@@ -201,10 +201,10 @@ class ComfyClient:
             except (OSError, websockets.WebSocketException, TimeoutError) as err:
                 if not logged:
                     logger.warning(
-                        "ComfyUI connection failed (%s), retrying with backoff (cap %.0fs): %r",
-                        self.base_url,
-                        RETRY_CAP,
-                        err,
+                        "ComfyUI connection failed, retrying with backoff",
+                        url=self.base_url,
+                        cap_seconds=RETRY_CAP,
+                        error=repr(err),
                     )
                     logged = True
             await on_event("disconnected", {})

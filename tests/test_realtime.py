@@ -6,6 +6,7 @@ Every wait is event driven; none of them sleep on a fixed poll interval.
 
 import asyncio
 import json
+import logging
 import uuid
 from contextlib import asynccontextmanager, suppress
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
+import structlog
 import websockets
 from conftest import AsgiWs, assert_camel
 from fastapi import HTTPException
@@ -247,6 +249,48 @@ async def test_generate_is_blocked_while_offline(rt, example_values, case):
     assert (err.value.status_code, err.value.detail) == (case.status, case.detail), (
         err.value
     )
+
+
+REJECTION = {
+    "error": {"type": "prompt_outputs_failed_validation", "message": "x"},
+    "node_errors": {
+        "6": {
+            "errors": [
+                {
+                    "type": "value_not_in_list",
+                    "extra_info": {"received_value": "SECRET_PROMPT_TEXT"},
+                }
+            ]
+        }
+    },
+}
+
+
+async def test_comfyui_rejection_keeps_the_prompt_out_of_the_warning(
+    rt, comfy_online, example_values, caplog
+):
+    caplog.set_level(logging.DEBUG)
+    body = GenerateRequest.model_validate(
+        {
+            "workflow_id": "example",
+            "session_id": OFF_SESSION,
+            "params": example_values,
+        },
+        by_name=True,
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host=OFF_IP))
+    reject = mock.patch.object(
+        rt.comfy, "submit_prompt", side_effect=comfy_client.ComfyError(REJECTION)
+    )
+    with reject, pytest.raises(HTTPException) as err:
+        await generate(body, request, rt)  # pyright: ignore[reportArgumentType]
+    assert (err.value.status_code, err.value.detail) == (400, "bad_request"), err.value
+    # The reason is bound to the log context, so the exception handler's WARNING line carries it.
+    reason = structlog.contextvars.get_contextvars()["reason"]
+    assert "prompt_outputs_failed_validation" in reason, reason
+    assert "SECRET_PROMPT_TEXT" not in reason, reason
+    debug = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert any("SECRET_PROMPT_TEXT" in m for m in debug), debug
 
 
 async def test_reconnect_brings_comfy_back_online(rt):

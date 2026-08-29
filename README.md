@@ -144,6 +144,8 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.port` | `8000` | The port the application binds to |
 | `server.database` | `data/comfypanel.db` | Where the database lives |
 | `server.docs` | `false` | Switch for `/docs`, `/redoc` and `/openapi.json` |
+| `server.log_level` | `INFO` | Log verbosity; `DEBUG` also prints rejected prompts and invalid request bodies |
+| `server.log_format` | `console` | `console` for people, `json` for a log collector, one object per line |
 | `comfyui.url` | `http://127.0.0.1:8188` | Where the ComfyUI API runs |
 | `eta.upscale_seconds_per_megapixel` | `0.7` | Extra wait factor for upscaling; calibrate it for your GPU and workflow |
 | `rate_limit.enabled` | `false` | Whether rate limiting is on |

@@ -144,6 +144,8 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.port` | `8000` | 應用預設 port |
 | `server.database` | `data/comfypanel.db` | 資料庫所在的位置 |
 | `server.docs` | `false` | 控制 `/docs`、`/redoc`、`/openapi.json` 開關 |
+| `server.log_level` | `INFO` | 日誌等級；`DEBUG` 會多印被拒絕的 prompt 與無效的請求內容 |
+| `server.log_format` | `console` | `console` 給人看，`json` 給日誌收集器，一行一個物件 |
 | `comfyui.url` | `http://127.0.0.1:8188` | ComfyUI API 運行位置 |
 | `eta.upscale_seconds_per_megapixel` | `0.7` | 圖片放大額外等待係數，須根據顯卡與工作流自行調整 |
 | `rate_limit.enabled` | `false` | 是否開啟 rate limit |

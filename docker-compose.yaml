@@ -10,6 +10,8 @@ services:
       SERVER__PORT: "8000"
       SERVER__DATABASE: /app/data/comfypanel.db
       COMFYUI__URL: http://host.docker.internal:8188
+      # Console log timestamps use the container's clock, which is UTC unless the host's zone is named here.
+      TZ: Asia/Taipei
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

@@ -2,16 +2,16 @@
 
 import asyncio
 import json
-import logging
 from collections import deque
 from contextlib import suppress
 
+import structlog
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 from app.models import CustomModel
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 MAX_BACKLOG = 256
 # Only the newest of these two matters: a new one replaces the queued one and does not count against the backlog.
@@ -62,7 +62,7 @@ class _Outbox:
                 await self.conn.send_text(text)
         except (WebSocketDisconnect, RuntimeError, ConnectionError):
             # A peer close raises WebSocketDisconnect; sending after close raises RuntimeError.
-            logger.debug("outbox finished (session=%s)", self.session_id, exc_info=True)
+            logger.debug("outbox finished", session_id=self.session_id, exc_info=True)
             self._die()
 
     def _die(self) -> None:

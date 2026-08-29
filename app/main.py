@@ -7,15 +7,15 @@ Docs follow the sub-app: /v1/docs, /v1/openapi.json, /v1/redoc.
 
 import asyncio
 import json
-import logging
 from contextlib import asynccontextmanager, suppress
 
+import structlog
 import yaml
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import config, errors, runtime
+from app import config, errors, log, runtime
 from app.config import WorkflowCatalog
 from app.forms.router import router as forms_router
 from app.history.router import router as history_router
@@ -25,7 +25,7 @@ from app.lora.router import router as lora_router
 from app.settings import ROOT
 from app.ws.router import router as ws_router
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 RELOAD_SECONDS = 30
 UI_DIR = ROOT / "frontend" / "dist"
@@ -58,6 +58,7 @@ async def lifespan(_app: FastAPI):
     await rt.aclose()
 
 
+log.setup(config.SETTINGS.log_format, config.SETTINGS.log_level)
 api = FastAPI(
     title="comfyPanel backend",
     openapi_url="/openapi.json" if config.SETTINGS.docs else None,
