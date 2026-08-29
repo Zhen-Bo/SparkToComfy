@@ -56,6 +56,7 @@ export default {
     cancelQueue: 'Leave queue',
     cancelGeneration: 'Cancel',
     busy: 'Generating…',
+    tooNarrow: 'Window too narrow', // the stage is too small to show a result; see app.minwNote
   },
   queue: {
     ahead: '{n} tasks ahead',

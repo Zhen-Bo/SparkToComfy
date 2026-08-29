@@ -62,6 +62,7 @@ export default {
     cancelQueue: '取消排隊',
     cancelGeneration: '取消生成',
     busy: '生成中…',
+    tooNarrow: '視窗太窄', // 舞台已小到看不見成品，見 app.minwNote
   },
   queue: {
     ahead: '前方還有 {n} 個任務',

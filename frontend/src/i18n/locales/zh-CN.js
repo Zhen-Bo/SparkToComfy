@@ -56,6 +56,7 @@ export default {
     cancelQueue: '取消排队',
     cancelGeneration: '取消生成',
     busy: '生成中…',
+    tooNarrow: '窗口太窄',
   },
   queue: {
     ahead: '前方还有 {n} 个任务',
