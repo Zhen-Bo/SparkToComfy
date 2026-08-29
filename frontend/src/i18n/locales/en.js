@@ -199,6 +199,7 @@ export default {
     execution_failed: 'ComfyUI execution error',
     interrupted: 'Job interrupted',
     comfyui_offline: 'ComfyUI went offline mid-run',
+    job_lost: 'ComfyUI lost track of the job',
     image_load_failed: 'Failed to load the result image',
     network_error: 'Cannot reach the backend',
     unexpected: 'Unexpected error',

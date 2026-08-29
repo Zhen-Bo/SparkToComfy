@@ -198,6 +198,7 @@ export default {
     execution_failed: 'ComfyUI 执行出错',
     interrupted: '任务被中断',
     comfyui_offline: 'ComfyUI 中途离线',
+    job_lost: 'ComfyUI 弄丢了这个任务',
     image_load_failed: '成品图载入失败',
     network_error: '连不上后端',
     unexpected: '未预期的错误',

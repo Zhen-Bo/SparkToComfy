@@ -136,3 +136,6 @@ class JobsService:
             await self.ctx.comfy.cancel_job(prompt_id)
         except httpx.HTTPError as err:
             raise HTTPException(status_code=502, detail="comfyui_unreachable") from err
+        # ComfyUI drops a job that had not started yet without reporting anything, so the queue is
+        # the only place the answer appears. Look now rather than wait for the next beat.
+        await self.events.refresh_positions()

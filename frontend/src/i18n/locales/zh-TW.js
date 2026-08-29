@@ -206,6 +206,7 @@ export default {
     execution_failed: 'ComfyUI 執行出錯',
     interrupted: '任務被中斷',
     comfyui_offline: 'ComfyUI 中途離線',
+    job_lost: 'ComfyUI 弄丟了這個任務',
     image_load_failed: '成品圖載入失敗',
     network_error: '連不上後端',
     unexpected: '未預期的錯誤',

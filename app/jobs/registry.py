@@ -30,11 +30,13 @@ class JobRegistry:
     def all_jobs(self) -> tuple[Job, ...]:
         return tuple(self._jobs.values())
 
-    def remove(self, prompt_id: str) -> None:
+    def remove(self, prompt_id: str) -> Job | None:
+        """Take the job out. The first caller gets it; every later one gets None."""
         job = self._jobs.pop(prompt_id, None)
         if job is None:
-            return
+            return None
         self.release_ip(job.ip, prompt_id)
+        return job
 
     def for_session(self, session_id: str) -> tuple[Job, ...]:
         return tuple(

@@ -23,6 +23,7 @@ from sqlalchemy import select
 
 from app.comfy import client as comfy_client
 from app.database import JobRow, JobSubmission, now
+from app.jobs.config import RECONCILE
 from app.jobs.models import Job
 from app.jobs.router import generate
 from app.jobs.schemas import GenerateRequest
@@ -589,6 +590,227 @@ async def test_backlog_overflow_closes_only_the_jammed_connection(rt, comfy_onli
     await healthy.close()
     assert SLOW_C not in rt.hub.connections, rt.hub.connections
     assert box.task.done(), box.task
+
+
+# --- reconcile: a job that leaves the ComfyUI queue with no event ---
+
+LOST_SESSION = "s-lost"
+LOST_IP = "127.0.0.21"
+EMPTY_QUEUE = {"queue_running": [], "queue_pending": []}
+
+
+def _in_flight(rt, pid, ip=LOST_IP, session=LOST_SESSION, params=None):
+    assert rt.registry.reserve_ip(ip, pid) is None, pid
+    rt.registry.add_job(make_job(pid, session, ip, params or {}))
+
+
+@asynccontextmanager
+async def _queue_says(rt, queue, history=None):
+    with (
+        mock.patch.object(rt.comfy, "get_queue", mock.AsyncMock(return_value=queue)),
+        mock.patch.object(
+            rt.comfy, "get_history", mock.AsyncMock(return_value=history)
+        ),
+    ):
+        yield
+
+
+async def test_cancelled_job_dropped_by_comfyui_is_settled(rt, comfy_online):
+    """Cancel lands before the job runs and ComfyUI deletes it silently.
+
+    No execution_interrupted ever arrives, so only the queue can say what happened.
+    """
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "lost-cancel-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    rt.registry.get(pid).cancelling = True
+
+    async with _queue_says(rt, EMPTY_QUEUE):
+        await rt.events.refresh_positions()
+
+    assert rt.registry.get(pid) is None, "the job must not stay in flight"
+    await conn.wait_for(1, what="cancelled messages")
+    assert conn.received[-1] == {"type": "job", "status": "cancelled"}, conn.received
+    probe = "probe-" + uuid.uuid4().hex
+    assert rt.registry.reserve_ip(LOST_IP, probe) is None, "the IP must be free again"
+    rt.registry.release_ip(LOST_IP, probe)
+
+
+async def test_vanished_job_is_retired_after_the_grace_period(rt, comfy_online):
+    """A job with no history record and no event. It is retired once it stays unlisted for a whole interval."""
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "vanished-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+
+    async with _queue_says(rt, EMPTY_QUEUE):
+        await rt.events.refresh_positions()
+        assert rt.registry.get(pid) is not None, (
+            "one absent pass is not proof: the terminal event may still be in flight"
+        )
+        rt.registry.get(pid).missing_since -= RECONCILE.interval_seconds
+        await rt.events.refresh_positions()
+
+    assert rt.registry.get(pid) is None, (
+        "a job absent for a whole interval must reach a terminal state"
+    )
+    await conn.wait_for(1, what="error messages")
+    assert conn.received[-1] == {
+        "type": "job",
+        "status": "error",
+        "code": "job_lost",
+    }, conn.received
+    async with rt.db.session() as session:
+        rows = (
+            await session.execute(select(JobRow.status).where(JobRow.prompt_id == pid))
+        ).all()
+    assert rows == [("error",)], rows
+
+
+async def test_job_that_finished_unheard_is_settled_from_history(rt, comfy_online):
+    """It left the queue because it finished. The history record is the proof, so it counts as done."""
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "silent-done-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    hist = {
+        "outputs": {
+            "9": {"images": [{"filename": "a.png", "subfolder": "", "type": "output"}]}
+        },
+        "status": {"status_str": "success"},
+    }
+
+    async with _queue_says(rt, EMPTY_QUEUE, history=hist):
+        await rt.events.refresh_positions()
+        rt.registry.get(pid).missing_since -= RECONCILE.interval_seconds
+        await rt.events.refresh_positions()
+
+    await conn.wait_for(1, what="done messages")
+    assert conn.received[-1] == {
+        "type": "job",
+        "status": "done",
+        "images": [f"/v1/images/{pid}?index=0"],
+    }, conn.received
+
+
+async def test_job_that_failed_unheard_is_settled_as_failed(rt, comfy_online):
+    """ComfyUI keeps a history record for a failed run too. A record without success is no result."""
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "silent-error-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    hist = {
+        "outputs": {},
+        "status": {
+            "status_str": "error",
+            "messages": [
+                ["execution_start", {"prompt_id": pid}],
+                ["execution_error", {"prompt_id": pid, "exception_message": "boom"}],
+            ],
+        },
+    }
+
+    async with _queue_says(rt, EMPTY_QUEUE, history=hist):
+        await rt.events.refresh_positions()
+        rt.registry.get(pid).missing_since -= RECONCILE.interval_seconds
+        await rt.events.refresh_positions()
+
+    await conn.wait_for(1, what="error messages")
+    assert conn.received[-1] == {
+        "type": "job",
+        "status": "error",
+        "code": "execution_failed",
+    }, conn.received
+    async with rt.db.session() as session:
+        rows = (
+            await session.execute(select(JobRow.status).where(JobRow.prompt_id == pid))
+        ).all()
+    assert rows == [("error",)], rows
+
+
+async def test_live_job_keeps_its_slot_and_is_never_retired(rt, comfy_online):
+    """The pass must only act on what is really gone, however often it runs."""
+    pid = "alive-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    queue = {"queue_running": [[0, pid]], "queue_pending": []}
+
+    async with _queue_says(rt, queue):
+        for _ in range(3):
+            await rt.events.refresh_positions()
+
+    assert rt.registry.get(pid) is not None, "a job ComfyUI still lists must stay"
+    assert rt.registry.reserve_ip(LOST_IP, "probe") == pid, "its IP stays reserved"
+
+
+# --- reconcile: a pass that lands while a job is still being submitted ---
+
+SUBMIT_SESSION = "s-submit-window"
+SUBMIT_IP = "127.0.0.51"
+
+
+async def test_passes_during_submit_do_not_retire_the_job(
+    rt, comfy_online, example_values
+):
+    """ComfyUI lists a job only once the submit POST returns; passes inside that window are not evidence."""
+    conn = RecordingConn()
+    rt.hub.add_connection(SUBMIT_SESSION, conn)
+    gate = asyncio.Event()
+    reached = asyncio.Event()
+
+    async def slow_submit(prompt, prompt_id):
+        reached.set()
+        await gate.wait()
+        return {}
+
+    body = GenerateRequest.model_validate(
+        {
+            "workflow_id": "example",
+            "session_id": SUBMIT_SESSION,
+            "params": example_values,
+        },
+        by_name=True,
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host=SUBMIT_IP))
+    result = None
+    try:
+        with (
+            mock.patch.object(rt.comfy, "submit_prompt", side_effect=slow_submit),
+            mock.patch.object(
+                rt.comfy, "get_queue", mock.AsyncMock(return_value=EMPTY_QUEUE)
+            ),
+            mock.patch.object(
+                rt.comfy, "get_history", mock.AsyncMock(return_value=None)
+            ),
+        ):
+            task = asyncio.create_task(generate(body, request, rt))  # pyright: ignore[reportArgumentType]
+            await reached.wait()
+            for _ in range(3):
+                await rt.events.refresh_positions()
+            gate.set()
+            result = await task
+        assert rt.registry.get(result.prompt_id) is not None, (
+            "the job must survive its own submit"
+        )
+        await conn.wait_for(1, what="receipts")
+        assert conn.received == [{"type": "receipt", "promptId": result.prompt_id}], (
+            conn.received
+        )
+    finally:
+        if result is not None and rt.registry.get(result.prompt_id) is not None:
+            rt.registry.remove(result.prompt_id)
+        await rt.hub.remove_connection(SUBMIT_SESSION, conn)
+
+
+# --- event guard: a handler that raises must not take the listener down ---
+
+
+async def test_failing_handler_does_not_escape(rt):
+    """The listener task calls handle() for every event; an exception escaping it ends the task."""
+    with mock.patch.object(
+        rt.events, "_handle", mock.AsyncMock(side_effect=RuntimeError("boom"))
+    ):
+        await rt.events.handle("progress", {"prompt_id": "x"})
 
 
 # --- job status: what a page asks after a reconnect ---

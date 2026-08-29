@@ -1,6 +1,6 @@
 """Mirror of the ComfyUI queue: who runs, who waits where, how long is left.
 
-Only ComfyUI events advance it.
+ComfyUI events advance it, and observe() corrects it against the real queue.
 HTTP requests and new WebSocket connections read the mirror instead of asking ComfyUI for its queue.
 """
 
@@ -18,19 +18,24 @@ class QueueMirror:
         return self.slots.get(prompt_id)
 
     async def mark_running(self, job) -> None:
+        """Announce the transition into running, once. observe() runs on every pass and would
+        otherwise resend running for the whole life of the job."""
+        if job.status == "running":
+            return
         job.status = "running"
         await self.ctx.hub.send_to_session(
             job.submission.session_id,
             ws_schemas.JobStatusMessage(status="running"),
         )
 
-    async def refresh(self) -> tuple[str, ...]:
-        """Recompute every job position and ETA.
+    async def observe(self) -> frozenset[str] | None:
+        """Read the ComfyUI queue, recompute every job position and ETA.
 
-        Return the prompt_id of each job that was cancelled and has left the queue.
+        Return the prompt_id of every job ComfyUI lists, or None when the queue was not read.
+        None is not an empty queue: on None nothing may be concluded about a missing job.
         """
         if not self.online or not self.ctx.registry.all_jobs():
-            return ()
+            return None
         queue = await self.ctx.comfy.get_queue()
         running = queue.get("queue_running") or []
         pending = sorted(queue.get("queue_pending") or [], key=lambda it: it[0])
@@ -60,9 +65,4 @@ class QueueMirror:
                 )
             ahead += self.ctx.eta.expected(job)
         self.slots = mirror
-        present = {item[1] for item in items}
-        return tuple(
-            job.prompt_id
-            for job in self.ctx.registry.all_jobs()
-            if job.cancelling and job.prompt_id not in present
-        )
+        return frozenset(item[1] for item in items)

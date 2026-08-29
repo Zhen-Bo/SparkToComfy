@@ -148,6 +148,7 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.log_level` | `INFO` | 日誌等級；`DEBUG` 會多印被拒絕的 prompt 與無效的請求內容 |
 | `server.log_format` | `console` | `console` 給人看，`json` 給日誌收集器，一行一個物件 |
 | `comfyui.url` | `http://127.0.0.1:8188` | ComfyUI API 運行位置 |
+| `reconcile.interval_seconds` | `10` | 多久比對一次 ComfyUI 佇列與進行中的工作；不見超過這段時間的工作視為遺失 |
 | `eta.upscale_seconds_per_megapixel` | `0.7` | 圖片放大額外等待係數，須根據顯卡與工作流自行調整 |
 | `rate_limit.enabled` | `false` | 是否開啟 rate limit |
 | `rate_limit.window_minutes` | `60` | Rate limit 間隔時間 |

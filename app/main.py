@@ -6,11 +6,9 @@ Docs follow the sub-app: /v1/docs, /v1/openapi.json, /v1/redoc.
 """
 
 import asyncio
-import json
 from contextlib import asynccontextmanager, suppress
 
 import structlog
-import yaml
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +19,7 @@ from app.config import WorkflowCatalog
 from app.forms.router import router as forms_router
 from app.history.router import router as history_router
 from app.images.router import router as images_router
+from app.jobs.config import RECONCILE
 from app.jobs.router import router as jobs_router
 from app.lora.router import router as lora_router
 from app.settings import ROOT
@@ -39,8 +38,24 @@ async def _reload_loop(catalog: WorkflowCatalog) -> None:
         await asyncio.sleep(RELOAD_SECONDS)
         try:
             await asyncio.to_thread(catalog.reload)
-        except (OSError, yaml.YAMLError, json.JSONDecodeError, KeyError, RuntimeError):
+        except Exception:
             logger.exception("Workflow reload failed, keeping the previous declaration")
+
+
+async def _reconcile_loop(rt: runtime.Runtime) -> None:
+    """Compare the ComfyUI queue against the jobs in flight, on a fixed beat.
+
+    Nothing here is needed while every ComfyUI event arrives; it exists for the case where one
+    does not. A pass that raises must not end the beat, or the safety net is gone for good.
+    """
+    while True:
+        await asyncio.sleep(RECONCILE.interval_seconds)
+        try:
+            await rt.events.refresh_positions()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Reconcile pass failed, retrying on the next beat")
 
 
 @asynccontextmanager
@@ -51,6 +66,7 @@ async def lifespan(_app: FastAPI):
     tasks = [
         asyncio.create_task(rt.comfy.listen(rt.events.handle)),
         asyncio.create_task(_reload_loop(rt.catalog)),
+        asyncio.create_task(_reconcile_loop(rt)),
     ]
     yield
     for task in tasks:

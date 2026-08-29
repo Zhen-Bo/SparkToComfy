@@ -148,6 +148,7 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.log_level` | `INFO` | Log verbosity; `DEBUG` also prints rejected prompts and invalid request bodies |
 | `server.log_format` | `console` | `console` for people, `json` for a log collector, one object per line |
 | `comfyui.url` | `http://127.0.0.1:8188` | Where the ComfyUI API runs |
+| `reconcile.interval_seconds` | `10` | How often the ComfyUI queue is compared against the jobs in flight; a job unlisted for longer than this counts as lost |
 | `eta.upscale_seconds_per_megapixel` | `0.7` | Extra wait factor for upscaling; calibrate it for your GPU and workflow |
 | `rate_limit.enabled` | `false` | Whether rate limiting is on |
 | `rate_limit.window_minutes` | `60` | Rate limit window length |
