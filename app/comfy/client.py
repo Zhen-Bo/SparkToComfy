@@ -8,6 +8,7 @@ decides which HTTP status each one becomes.
 import asyncio
 import json
 import struct
+import time
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -24,6 +25,8 @@ TIMEOUT = 30.0
 RETRY_FIRST = 1.0  # first reconnect backoff, in seconds
 RETRY_CAP = 30.0  # reconnect backoff ceiling, in seconds
 _LORA_PAGE = 100
+# The listing is read on every cover request, and ComfyUI pages it out slowly.
+_LORA_CACHE_SECONDS = 60.0
 _PREVIEW_EVENT = 4  # ComfyUI binary frame event type: preview image
 _TEXT_TYPES = frozenset(
     {
@@ -78,6 +81,7 @@ class ComfyClient:
             timeout=httpx.Timeout(timeout),
             transport=transport,
         )
+        self._loras: tuple[float, list[dict]] | None = None  # (expires_at, items)
 
     async def aclose(self) -> None:
         await self.http.aclose()
@@ -114,6 +118,8 @@ class ComfyClient:
         return resp.get(prompt_id)
 
     async def list_loras(self) -> list[dict]:
+        if self._loras is not None and self._loras[0] > time.monotonic():
+            return self._loras[1]
         first = await self._get_json("/api/lm/loras/list", {"page_size": _LORA_PAGE})
         items = list(first.get("items") or [])
         for page in range(2, (first.get("total_pages") or 1) + 1):
@@ -121,6 +127,7 @@ class ComfyClient:
                 "/api/lm/loras/list", {"page_size": _LORA_PAGE, "page": page}
             )
             items.extend(more.get("items") or [])
+        self._loras = (time.monotonic() + _LORA_CACHE_SECONDS, items)
         return items
 
     async def fetch_preview(self, preview_url: str) -> tuple[bytes, str]:
