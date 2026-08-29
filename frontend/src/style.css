@@ -143,8 +143,9 @@
     background: hsl(var(--amber));
     color: hsl(var(--primary-foreground));
   }
+  /* 2px is the thinnest ring WCAG 2.4.13 accepts for a perimeter indicator; 1.5px broke up on a dark ground at the amber lightness step. */
   :focus-visible {
-    outline: 1.5px solid hsl(var(--amber));
+    outline: 2px solid hsl(var(--amber));
     outline-offset: 2px;
   }
   /* Preview SVGs fill their host container so preserveAspectRatio, slice or meet, takes effect.
@@ -251,12 +252,15 @@
       box-shadow .2s var(--ease-fluid);
   }
 
-  /* Reduced motion: transitions collapse to nearly instant while the state changes stay, so no feedback is destroyed.
+  /* Reduced motion removes travel, not feedback.
+     Transitions keep their normal timing but are narrowed to the properties that do not move anything,
+     so hover, focus, selection and state colour still cross-fade while transform, width and position snap.
+     Keyframe animations run out at .01ms; every one of them uses fill-mode both, so the element lands on its final frame and the state change survives.
      The two animations that carry state meaning, the queue slot blink and the upscale scan line,
      are slowed fourfold rather than killed, so the change stays readable. */
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
-      transition-duration: .01ms !important;
+      transition-property: color, background-color, border-color, box-shadow, opacity, fill, stroke !important;
       animation-duration: .01ms !important;
       animation-iteration-count: 1 !important;
     }
