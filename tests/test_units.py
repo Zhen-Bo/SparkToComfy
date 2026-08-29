@@ -292,6 +292,24 @@ async def test_cover_maps_upstream_404(lora_manager_rt):
     )
 
 
+async def test_lora_listing_is_cached():
+    """Every cover request reads the listing; inside the window only the first one reaches ComfyUI."""
+    calls = 0
+
+    def counting(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200, json={"items": [{"file_name": COVER_LORA}], "total_pages": 1}
+        )
+
+    client = comfy_client.ComfyClient(
+        "http://lora-manager.test", transport=httpx.MockTransport(counting)
+    )
+    assert await client.list_loras() == await client.list_loras()
+    assert calls == 1, calls
+
+
 # --- reload ---
 
 

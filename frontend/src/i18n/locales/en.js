@@ -7,6 +7,7 @@ export default {
   },
   common: {
     value: 'Value',
+    dismiss: 'Dismiss this message',
   },
   tabs: {
     aria: 'Control tabs',
@@ -55,6 +56,7 @@ export default {
     cancelQueue: 'Leave queue',
     cancelGeneration: 'Cancel',
     busy: 'Generating…',
+    tooNarrow: 'Window too narrow', // the stage is too small to show a result; see app.minwNote
   },
   queue: {
     ahead: '{n} tasks ahead',
@@ -156,9 +158,7 @@ export default {
     nextTitle: 'Next (→)',
     imgAlt: 'History image {n}: {width} × {height}',
     hintWheel: 'Wheel ─ Zoom',
-    hintReset: '0 ─ Reset',
     hintCopy: 'CTRL+C ─ Copy',
-    hintClose: 'ESC ─ Close',
     params: 'Image parameters',
     collapsePanel: 'Collapse parameters panel',
     expandPanel: 'Expand parameters panel',
@@ -166,10 +166,11 @@ export default {
     backfill: 'Restore all parameters',
     size: 'Size',
     steps: 'Steps',
-    quality: 'Quality ─ {text}',
+    positive: 'Positive prompt ─ {text}',
+    quality: 'Quality prompt ─ {text}',
     sampler: 'Sampler',
     model: 'Model',
-    negative: 'Negative ─ {text}',
+    negative: 'Negative prompt ─ {text}',
   },
   notify: {
     generateFailed: 'Generation failed ─ {reason}',
@@ -199,6 +200,7 @@ export default {
     execution_failed: 'ComfyUI execution error',
     interrupted: 'Job interrupted',
     comfyui_offline: 'ComfyUI went offline mid-run',
+    job_lost: 'ComfyUI lost track of the job',
     image_load_failed: 'Failed to load the result image',
     network_error: 'Cannot reach the backend',
     unexpected: 'Unexpected error',

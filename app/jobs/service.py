@@ -6,6 +6,7 @@ Event progression lives in app/jobs/events.py.
 import uuid
 
 import httpx
+import structlog
 from fastapi import HTTPException
 
 from app.comfy.client import ComfyError
@@ -19,6 +20,8 @@ from app.jobs.queue import QueueMirror
 from app.jobs.ratelimit import IpRateLimiter
 from app.jobs.schemas import GenerateRequest
 from app.ws import schemas as ws_schemas
+
+logger = structlog.stdlib.get_logger(__name__)
 
 
 class JobsService:
@@ -72,7 +75,7 @@ class JobsService:
             upscale=values["upscale"],
         )
 
-    async def submit(self, body: GenerateRequest, ip: str) -> None:
+    async def submit(self, body: GenerateRequest, ip: str) -> str:
         wf, values = self._accept(body)
         job = self._build_job(body, wf["parameters"], values, ip)
         active = self.ctx.registry.reserve_ip(job.ip, job.prompt_id)
@@ -88,7 +91,13 @@ class JobsService:
             try:
                 await self.ctx.comfy.submit_prompt(prompt, job.prompt_id)
             except ComfyError as err:
-                set_reason(f"comfyui rejected the prompt: {err.payload}")
+                # The payload repeats the node inputs, so the warning carries the error type alone.
+                try:
+                    kind = err.payload["error"]["type"]
+                except (KeyError, TypeError):
+                    kind = "unknown"
+                set_reason(f"comfyui rejected the prompt: {kind}")
+                logger.debug("comfyui rejection", payload=err.payload)
                 raise HTTPException(status_code=400, detail="bad_request") from err
             except httpx.HTTPError as err:
                 raise HTTPException(
@@ -103,7 +112,14 @@ class JobsService:
             job.submission.session_id,
             ws_schemas.ReceiptMessage(prompt_id=job.prompt_id),
         )
+        logger.info(
+            "job queued",
+            prompt_id=job.prompt_id,
+            ip=job.ip,
+            workflow=body.workflow_id,
+        )
         await self.events.refresh_positions()
+        return job.prompt_id
 
     async def cancel(self, prompt_id: str, session_id: str) -> None:
         job = self.ctx.registry.get(prompt_id)
@@ -120,3 +136,6 @@ class JobsService:
             await self.ctx.comfy.cancel_job(prompt_id)
         except httpx.HTTPError as err:
             raise HTTPException(status_code=502, detail="comfyui_unreachable") from err
+        # ComfyUI drops a job that had not started yet without reporting anything, so the queue is
+        # the only place the answer appears. Look now rather than wait for the next beat.
+        await self.events.refresh_positions()

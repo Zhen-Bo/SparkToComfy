@@ -11,6 +11,7 @@ export default {
   },
   common: {
     value: '數值', // 裸控件的無障礙名稱預設（ui/Slider、obs/ParamSlider）
+    dismiss: '關閉這則訊息',
   },
   tabs: {
     aria: '控制分頁',
@@ -61,6 +62,7 @@ export default {
     cancelQueue: '取消排隊',
     cancelGeneration: '取消生成',
     busy: '生成中…',
+    tooNarrow: '視窗太窄', // 舞台已小到看不見成品，見 app.minwNote
   },
   queue: {
     ahead: '前方還有 {n} 個任務',
@@ -163,9 +165,7 @@ export default {
     nextTitle: '下一張（→）',
     imgAlt: '歷史圖 {n}：{width} × {height}',
     hintWheel: '滾輪 ─ 縮放',
-    hintReset: '0 ─ 重置',
     hintCopy: 'CTRL+C ─ 複製',
-    hintClose: 'ESC ─ 關閉',
     params: '圖片參數',
     collapsePanel: '收合參數面板',
     expandPanel: '展開參數面板',
@@ -173,10 +173,11 @@ export default {
     backfill: '回填全部參數',
     size: '尺寸',
     steps: '步數',
-    quality: '品質 ─ {text}',
+    positive: '正面提示詞 ─ {text}',
+    quality: '品質提示詞 ─ {text}',
     sampler: '採樣器',
     model: '模型',
-    negative: '負面 ─ {text}',
+    negative: '負面提示詞 ─ {text}',
   },
   notify: {
     generateFailed: '生成失敗 ─ {reason}',
@@ -206,6 +207,7 @@ export default {
     execution_failed: 'ComfyUI 執行出錯',
     interrupted: '任務被中斷',
     comfyui_offline: 'ComfyUI 中途離線',
+    job_lost: 'ComfyUI 弄丟了這個任務',
     image_load_failed: '成品圖載入失敗',
     network_error: '連不上後端',
     unexpected: '未預期的錯誤',

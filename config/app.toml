@@ -3,9 +3,14 @@ host = "0.0.0.0"                # use "127.0.0.1" to keep it on this machine onl
 port = 8000
 database = "data/comfypanel.db" # relative to the repo root; an absolute path also works
 docs = false                    # set true to open /docs /redoc /openapi.json while developing
+log_level = "INFO"              # DEBUG also prints rejected prompts and invalid request bodies
+log_format = "console"          # "json" prints one JSON object per line, for a log collector
 
 [comfyui]
 url = "http://127.0.0.1:8188"   # deployment example: http://10.10.10.2:8188
+
+[reconcile]
+interval_seconds = 10  # how often the ComfyUI queue is compared against the jobs in flight; a job unlisted for longer than this counts as lost
 
 [eta]
 upscale_seconds_per_megapixel = 0.7  # upscale surcharge factor; calibrate per GPU

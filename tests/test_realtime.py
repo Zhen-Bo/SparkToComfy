@@ -6,6 +6,7 @@ Every wait is event driven; none of them sleep on a fixed poll interval.
 
 import asyncio
 import json
+import logging
 import uuid
 from contextlib import asynccontextmanager, suppress
 from types import SimpleNamespace
@@ -14,19 +15,23 @@ from unittest import mock
 
 import pytest
 import pytest_asyncio
+import structlog
 import websockets
 from conftest import AsgiWs, assert_camel
 from fastapi import HTTPException
 from sqlalchemy import select
 
+from app import main as app_main
 from app.comfy import client as comfy_client
 from app.database import JobRow, JobSubmission, now
+from app.jobs.config import RECONCILE
 from app.jobs.models import Job
 from app.jobs.router import generate
 from app.jobs.schemas import GenerateRequest
 from app.ws import service as ws_service
 from app.ws.schemas import (
     JobQueuedMessage,
+    PingMessage,
     PreviewMessage,
     ProgressMessage,
     ReceiptMessage,
@@ -247,6 +252,89 @@ async def test_generate_is_blocked_while_offline(rt, example_values, case):
     assert (err.value.status_code, err.value.detail) == (case.status, case.detail), (
         err.value
     )
+
+
+REJECTION = {
+    "error": {"type": "prompt_outputs_failed_validation", "message": "x"},
+    "node_errors": {
+        "6": {
+            "errors": [
+                {
+                    "type": "value_not_in_list",
+                    "extra_info": {"received_value": "SECRET_PROMPT_TEXT"},
+                }
+            ]
+        }
+    },
+}
+
+
+async def test_comfyui_rejection_keeps_the_prompt_out_of_the_warning(
+    rt, comfy_online, example_values, caplog
+):
+    caplog.set_level(logging.DEBUG)
+    body = GenerateRequest.model_validate(
+        {
+            "workflow_id": "example",
+            "session_id": OFF_SESSION,
+            "params": example_values,
+        },
+        by_name=True,
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host=OFF_IP))
+    reject = mock.patch.object(
+        rt.comfy, "submit_prompt", side_effect=comfy_client.ComfyError(REJECTION)
+    )
+    with reject, pytest.raises(HTTPException) as err:
+        await generate(body, request, rt)  # pyright: ignore[reportArgumentType]
+    assert (err.value.status_code, err.value.detail) == (400, "bad_request"), err.value
+    # The reason is bound to the log context, so the exception handler's WARNING line carries it.
+    reason = structlog.contextvars.get_contextvars()["reason"]
+    assert "prompt_outputs_failed_validation" in reason, reason
+    assert "SECRET_PROMPT_TEXT" not in reason, reason
+    debug = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert any("SECRET_PROMPT_TEXT" in m for m in debug), debug
+
+
+RECEIPT_SESSION = "s-receipt"
+RECEIPT_IP = "127.0.0.31"
+
+
+async def test_generate_answers_with_the_receipt_id(rt, comfy_online, example_values):
+    """The HTTP answer and the receipt frame must name the same job."""
+    conn = RecordingConn()
+    rt.hub.add_connection(RECEIPT_SESSION, conn)
+    body = GenerateRequest.model_validate(
+        {
+            "workflow_id": "example",
+            "session_id": RECEIPT_SESSION,
+            "params": example_values,
+        },
+        by_name=True,
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host=RECEIPT_IP))
+    result = None
+    try:
+        with (
+            mock.patch.object(
+                rt.comfy, "submit_prompt", mock.AsyncMock(return_value={})
+            ),
+            mock.patch.object(
+                rt.comfy,
+                "get_queue",
+                mock.AsyncMock(return_value={"queue_running": [], "queue_pending": []}),
+            ),
+        ):
+            result = await generate(body, request, rt)  # pyright: ignore[reportArgumentType]
+        assert result.prompt_id, result
+        await conn.wait_for(1, what="receipts")
+        assert conn.received[0] == {"type": "receipt", "promptId": result.prompt_id}, (
+            conn.received
+        )
+    finally:
+        if result is not None and rt.registry.get(result.prompt_id) is not None:
+            rt.registry.remove(result.prompt_id)
+        await rt.hub.remove_connection(RECEIPT_SESSION, conn)
 
 
 async def test_reconnect_brings_comfy_back_online(rt):
@@ -504,3 +592,338 @@ async def test_backlog_overflow_closes_only_the_jammed_connection(rt, comfy_onli
     await healthy.close()
     assert SLOW_C not in rt.hub.connections, rt.hub.connections
     assert box.task.done(), box.task
+
+
+# --- heartbeat ---
+
+PING_A = "ping-first"
+PING_B = "ping-second"
+PING_C = "ping-slow"
+
+
+async def test_heartbeat_reaches_every_connection(rt):
+    """The beat is what a browser watches; every live connection has to feel it."""
+    a, b = RecordingConn(), RecordingConn()
+    rt.hub.add_connection(PING_A, a)
+    rt.hub.add_connection(PING_B, b)
+    with mock.patch.object(app_main, "PING_SECONDS", 0.01):
+        task = asyncio.create_task(app_main._heartbeat_loop(rt.hub))
+        try:
+            for label, conn in (("a", a), ("b", b)):
+                await conn.wait_for(1, what="pings")
+                assert conn.received[0] == {"type": "ping"}, (label, conn.received)
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+            await rt.hub.remove_connection(PING_A, a)
+            await rt.hub.remove_connection(PING_B, b)
+
+
+async def test_ping_never_counts_against_the_backlog(rt):
+    """A connection nobody reads gets a ping every 25 s; it must never be what closes it."""
+    slow = RecordingConn(gated=True)
+    rt.hub.add_connection(PING_C, slow)
+    try:
+        for _ in range(3):
+            await rt.hub.send_to_session(PING_C, PingMessage())
+        box = rt.hub.connections[PING_C][slow]
+        assert box.events == 0, box.events
+        # The pump may hold the first ping already, waiting on the gate.
+        assert len(box.queue) <= 1, list(box.queue)
+    finally:
+        await rt.hub.remove_connection(PING_C, slow)
+
+
+# --- reconcile: a job that leaves the ComfyUI queue with no event ---
+
+LOST_SESSION = "s-lost"
+LOST_IP = "127.0.0.21"
+EMPTY_QUEUE = {"queue_running": [], "queue_pending": []}
+
+
+def _in_flight(rt, pid, ip=LOST_IP, session=LOST_SESSION, params=None):
+    assert rt.registry.reserve_ip(ip, pid) is None, pid
+    rt.registry.add_job(make_job(pid, session, ip, params or {}))
+
+
+@asynccontextmanager
+async def _queue_says(rt, queue, history=None):
+    with (
+        mock.patch.object(rt.comfy, "get_queue", mock.AsyncMock(return_value=queue)),
+        mock.patch.object(
+            rt.comfy, "get_history", mock.AsyncMock(return_value=history)
+        ),
+    ):
+        yield
+
+
+async def test_cancelled_job_dropped_by_comfyui_is_settled(rt, comfy_online):
+    """Cancel lands before the job runs and ComfyUI deletes it silently.
+
+    No execution_interrupted ever arrives, so only the queue can say what happened.
+    """
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "lost-cancel-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    rt.registry.get(pid).cancelling = True
+
+    async with _queue_says(rt, EMPTY_QUEUE):
+        await rt.events.refresh_positions()
+
+    assert rt.registry.get(pid) is None, "the job must not stay in flight"
+    await conn.wait_for(1, what="cancelled messages")
+    assert conn.received[-1] == {"type": "job", "status": "cancelled"}, conn.received
+    probe = "probe-" + uuid.uuid4().hex
+    assert rt.registry.reserve_ip(LOST_IP, probe) is None, "the IP must be free again"
+    rt.registry.release_ip(LOST_IP, probe)
+
+
+async def test_vanished_job_is_retired_after_the_grace_period(rt, comfy_online):
+    """A job with no history record and no event. It is retired once it stays unlisted for a whole interval."""
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "vanished-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+
+    async with _queue_says(rt, EMPTY_QUEUE):
+        await rt.events.refresh_positions()
+        assert rt.registry.get(pid) is not None, (
+            "one absent pass is not proof: the terminal event may still be in flight"
+        )
+        rt.registry.get(pid).missing_since -= RECONCILE.interval_seconds
+        await rt.events.refresh_positions()
+
+    assert rt.registry.get(pid) is None, (
+        "a job absent for a whole interval must reach a terminal state"
+    )
+    await conn.wait_for(1, what="error messages")
+    assert conn.received[-1] == {
+        "type": "job",
+        "status": "error",
+        "code": "job_lost",
+    }, conn.received
+    async with rt.db.session() as session:
+        rows = (
+            await session.execute(select(JobRow.status).where(JobRow.prompt_id == pid))
+        ).all()
+    assert rows == [("error",)], rows
+
+
+async def test_job_that_finished_unheard_is_settled_from_history(rt, comfy_online):
+    """It left the queue because it finished. The history record is the proof, so it counts as done."""
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "silent-done-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    hist = {
+        "outputs": {
+            "9": {"images": [{"filename": "a.png", "subfolder": "", "type": "output"}]}
+        },
+        "status": {"status_str": "success"},
+    }
+
+    async with _queue_says(rt, EMPTY_QUEUE, history=hist):
+        await rt.events.refresh_positions()
+        rt.registry.get(pid).missing_since -= RECONCILE.interval_seconds
+        await rt.events.refresh_positions()
+
+    await conn.wait_for(1, what="done messages")
+    assert conn.received[-1] == {
+        "type": "job",
+        "status": "done",
+        "images": [f"/v1/images/{pid}?index=0"],
+    }, conn.received
+
+
+async def test_job_that_failed_unheard_is_settled_as_failed(rt, comfy_online):
+    """ComfyUI keeps a history record for a failed run too. A record without success is no result."""
+    conn = RecordingConn()
+    rt.hub.add_connection(LOST_SESSION, conn)
+    pid = "silent-error-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    hist = {
+        "outputs": {},
+        "status": {
+            "status_str": "error",
+            "messages": [
+                ["execution_start", {"prompt_id": pid}],
+                ["execution_error", {"prompt_id": pid, "exception_message": "boom"}],
+            ],
+        },
+    }
+
+    async with _queue_says(rt, EMPTY_QUEUE, history=hist):
+        await rt.events.refresh_positions()
+        rt.registry.get(pid).missing_since -= RECONCILE.interval_seconds
+        await rt.events.refresh_positions()
+
+    await conn.wait_for(1, what="error messages")
+    assert conn.received[-1] == {
+        "type": "job",
+        "status": "error",
+        "code": "execution_failed",
+    }, conn.received
+    async with rt.db.session() as session:
+        rows = (
+            await session.execute(select(JobRow.status).where(JobRow.prompt_id == pid))
+        ).all()
+    assert rows == [("error",)], rows
+
+
+async def test_live_job_keeps_its_slot_and_is_never_retired(rt, comfy_online):
+    """The pass must only act on what is really gone, however often it runs."""
+    pid = "alive-" + uuid.uuid4().hex
+    _in_flight(rt, pid)
+    queue = {"queue_running": [[0, pid]], "queue_pending": []}
+
+    async with _queue_says(rt, queue):
+        for _ in range(3):
+            await rt.events.refresh_positions()
+
+    assert rt.registry.get(pid) is not None, "a job ComfyUI still lists must stay"
+    assert rt.registry.reserve_ip(LOST_IP, "probe") == pid, "its IP stays reserved"
+
+
+# --- reconcile: a pass that lands while a job is still being submitted ---
+
+SUBMIT_SESSION = "s-submit-window"
+SUBMIT_IP = "127.0.0.51"
+
+
+async def test_passes_during_submit_do_not_retire_the_job(
+    rt, comfy_online, example_values
+):
+    """ComfyUI lists a job only once the submit POST returns; passes inside that window are not evidence."""
+    conn = RecordingConn()
+    rt.hub.add_connection(SUBMIT_SESSION, conn)
+    gate = asyncio.Event()
+    reached = asyncio.Event()
+
+    async def slow_submit(prompt, prompt_id):
+        reached.set()
+        await gate.wait()
+        return {}
+
+    body = GenerateRequest.model_validate(
+        {
+            "workflow_id": "example",
+            "session_id": SUBMIT_SESSION,
+            "params": example_values,
+        },
+        by_name=True,
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host=SUBMIT_IP))
+    result = None
+    try:
+        with (
+            mock.patch.object(rt.comfy, "submit_prompt", side_effect=slow_submit),
+            mock.patch.object(
+                rt.comfy, "get_queue", mock.AsyncMock(return_value=EMPTY_QUEUE)
+            ),
+            mock.patch.object(
+                rt.comfy, "get_history", mock.AsyncMock(return_value=None)
+            ),
+        ):
+            task = asyncio.create_task(generate(body, request, rt))  # pyright: ignore[reportArgumentType]
+            await reached.wait()
+            for _ in range(3):
+                await rt.events.refresh_positions()
+            gate.set()
+            result = await task
+        assert rt.registry.get(result.prompt_id) is not None, (
+            "the job must survive its own submit"
+        )
+        await conn.wait_for(1, what="receipts")
+        assert conn.received == [{"type": "receipt", "promptId": result.prompt_id}], (
+            conn.received
+        )
+    finally:
+        if result is not None and rt.registry.get(result.prompt_id) is not None:
+            rt.registry.remove(result.prompt_id)
+        await rt.hub.remove_connection(SUBMIT_SESSION, conn)
+
+
+# --- event guard: a handler that raises must not take the listener down ---
+
+
+async def test_failing_handler_does_not_escape(rt):
+    """The listener task calls handle() for every event; an exception escaping it ends the task."""
+    with mock.patch.object(
+        rt.events, "_handle", mock.AsyncMock(side_effect=RuntimeError("boom"))
+    ):
+        await rt.events.handle("progress", {"prompt_id": "x"})
+
+
+# --- job status: what a page asks after a reconnect ---
+
+STATUS_SESSION = "s-jobstatus"
+STATUS_IP = "127.0.0.41"
+
+
+async def test_job_status_endpoint(client, rt, example_values):
+    unknown = await client.get(
+        f"/v1/jobs/{uuid.uuid4().hex}?sessionId={STATUS_SESSION}"
+    )
+    assert unknown.status_code == 404, unknown.text
+    assert unknown.json()["code"] == "not_found", unknown.text
+
+    flight = "flight-" + uuid.uuid4().hex
+    assert rt.registry.reserve_ip(STATUS_IP, flight) is None
+    rt.registry.add_job(make_job(flight, STATUS_SESSION, STATUS_IP, example_values))
+    try:
+        queued = await client.get(f"/v1/jobs/{flight}?sessionId={STATUS_SESSION}")
+        assert queued.status_code == 200, queued.text
+        assert queued.json() == {"status": "queued", "images": [], "error": None}, (
+            queued.text
+        )
+        assert_camel(queued.json(), "queued")
+
+        stranger = await client.get(f"/v1/jobs/{flight}?sessionId=someone-else")
+        assert stranger.status_code == 404, stranger.text
+
+        rt.registry.get(flight).status = "running"
+        running = await client.get(f"/v1/jobs/{flight}?sessionId={STATUS_SESSION}")
+        assert running.json()["status"] == "running", running.text
+        assert_camel(running.json(), "running")
+    finally:
+        rt.registry.remove(flight)
+
+    finished = "done-" + uuid.uuid4().hex
+    job = make_job(finished, STATUS_SESSION, STATUS_IP, example_values)
+    await rt.db.insert_finished(
+        job.submission,
+        "done",
+        images=[{"filename": "a.png", "subfolder": "", "type": "output"}],
+    )
+    done = await client.get(f"/v1/jobs/{finished}?sessionId={STATUS_SESSION}")
+    assert done.status_code == 200, done.text
+    assert done.json() == {
+        "status": "done",
+        "images": [f"/v1/images/{finished}?index=0"],
+        "error": None,
+    }, done.text
+    assert_camel(done.json(), "done")
+
+    broken = "error-" + uuid.uuid4().hex
+    job = make_job(broken, STATUS_SESSION, STATUS_IP, example_values)
+    await rt.db.insert_finished(job.submission, "error", error="boom")
+    failed = await client.get(f"/v1/jobs/{broken}?sessionId={STATUS_SESSION}")
+    assert failed.status_code == 200, failed.text
+    assert failed.json() == {"status": "error", "images": [], "error": "boom"}, (
+        failed.text
+    )
+    assert_camel(failed.json(), "error")
+
+
+# --- body limit: a request bigger than any legitimate one is refused before it is read ---
+
+
+async def test_oversized_body_is_refused(client):
+    resp = await client.post(
+        "/v1/generate",
+        content=b"{" + b" " * (64 * 1024) + b"}",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 413, resp.status_code

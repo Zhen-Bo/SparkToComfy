@@ -168,13 +168,15 @@ async def test_generate_rejects_disabled_model(client, example_values):
     assert body["code"] == "bad_request", body
 
 
-def test_openapi_generate_has_no_response_body(openapi):
-    assert "GenerateResponse" not in openapi["components"]["schemas"], openapi[
-        "components"
+def test_openapi_generate_returns_the_prompt_id(openapi):
+    schema = openapi["components"]["schemas"]
+    assert "GenerateResponse" in schema, schema
+    assert set(schema["GenerateResponse"]["properties"]) == {"promptId"}, schema[
+        "GenerateResponse"
     ]
     gen_resp = openapi["paths"]["/generate"]["post"]["responses"]
-    assert "200" not in gen_resp, gen_resp
-    assert "204" in gen_resp and "content" not in gen_resp["204"], gen_resp
+    assert "200" in gen_resp, gen_resp
+    assert "204" not in gen_resp, gen_resp
 
 
 def test_openapi_control_type_enum(openapi):
@@ -348,15 +350,19 @@ def test_openapi_cancel_has_no_response_model(openapi):
     ]
 
 
+def _parameters(item):
+    """(method, param) for every parameter under one path item; the shared ones carry method None."""
+    for method, op in [(None, item), *item.items()]:
+        if not isinstance(op, dict):
+            continue
+        for param in op.get("parameters") or []:
+            yield method, param
+
+
 def test_openapi_parameters_are_camel(openapi):
     for path, item in openapi["paths"].items():
-        for method, op in item.items():
-            if method == "parameters" or not isinstance(op, dict):
-                continue
-            for param in op.get("parameters") or []:
-                assert "_" not in param["name"], (path, method, param["name"])
-        for param in item.get("parameters") or []:
-            assert "_" not in param["name"], (path, param["name"])
+        for method, param in _parameters(item):
+            assert "_" not in param["name"], (path, method, param["name"])
 
 
 def test_openapi_schema_properties_are_camel(openapi):

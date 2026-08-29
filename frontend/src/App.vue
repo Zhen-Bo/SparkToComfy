@@ -1,7 +1,11 @@
 <script setup>
 import { onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { initStudio } from '@/stores/connection'
-import { toast } from '@/stores/notify'
+import { dismissNotice, toast } from '@/stores/notify'
+import { PhX } from '@phosphor-icons/vue'
+
+const { t } = useI18n()
 
 // Toast transition classes are in the style block below.
 // from/to carry translateX(-50%) explicitly, so they do not depend on how Tailwind orders its centring transforms.
@@ -23,7 +27,8 @@ onMounted(initStudio)
     -->
   <router-view />
 
-  <!-- Global toast: top centre, gone on its own after about 2.2 seconds.
+  <!-- Global toast: top centre.
+       A confirmation leaves on its own after about 2.2 seconds. A failure stays, turns destructive, and carries a close button, because the user must be able to read it after looking away.
        It is teleported to body for two reasons.
        The viewer and the clear dialog set #app inert, and a role=status left inside #app would leave the accessibility tree and never be announced.
        And at the bottom it would sit right on the viewer navigation dock.
@@ -32,9 +37,23 @@ onMounted(initStudio)
     <Transition name="toast">
       <div
         v-if="toast.notice"
-        class="obs-panel fixed left-1/2 top-7 z-[300] -translate-x-1/2 border border-amber/50 px-4 py-2 font-mono text-[11px] tracking-[.12em] text-amber-bright shadow-[0_4px_16px_hsl(var(--dome)/.5)]"
-        role="status"
-      >{{ toast.notice }}</div>
+        class="obs-panel fixed left-1/2 top-7 z-[300] flex max-w-[min(92vw,520px)] -translate-x-1/2 items-center gap-2 py-2 pl-4 font-mono text-[11px] tracking-[.12em] shadow-[0_4px_16px_hsl(var(--dome)/.5)]"
+        :class="toast.sticky
+          ? 'border border-destructive/70 pr-1.5 text-destructive'
+          : 'border border-amber/50 pr-4 text-amber-bright'"
+        :role="toast.sticky ? 'alert' : 'status'"
+      >
+        <span class="min-w-0">{{ toast.notice }}</span>
+        <button
+          v-if="toast.sticky"
+          type="button"
+          class="obs-tr grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-elevated hover:text-foreground active:scale-95"
+          :aria-label="t('common.dismiss')"
+          @click="dismissNotice"
+        >
+          <PhX class="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
     </Transition>
   </Teleport>
 </template>

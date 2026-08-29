@@ -2,9 +2,9 @@
 /* The bottom navigation dock sits below the viewport edge and rises when the pointer enters the bottom hot zone or Tab reaches one of its buttons.
    It rises immediately, with no delay timer.
    The hot zone is also part of "click outside the image to close", so clicks on the dock itself stop propagation.
-   The dock stays an 88% ghost to hold the readability floor over bright images.
+   The dock stays a ghost to hold the readability floor over bright images.
 
-   Touch devices have no hover, so there the dock stays out.
+   Anywhere a finger is one of the inputs, the dock stays out instead.
    While risen it overlays the image, the usual image-viewer behaviour, so it takes no layout space and the fit maths never involves it. */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -19,7 +19,11 @@ defineProps({
 })
 const emit = defineEmits(['go', 'close'])
 
-const hoverCapable = typeof matchMedia !== 'undefined' && matchMedia('(hover: hover)').matches
+/* The dock only retracts where a pointer can bring it back.
+   A hybrid machine reports hover: hover for its mouse while a finger is still an input on it, so any-pointer: coarse keeps the dock out there too; hiding the counter behind a gesture that hand does not have would lose it. */
+const hoverCapable = typeof matchMedia !== 'undefined'
+  && matchMedia('(hover: hover)').matches
+  && !matchMedia('(any-pointer: coarse)').matches
 const up = ref(!hoverCapable)
 const el = ref(null)
 
@@ -50,7 +54,7 @@ function focusOut(e) {
         type="button"
         :title="t('viewer.prevTitle')"
         :aria-label="t('viewer.prev')"
-        class="obs-tr flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-amber-bright"
+        class="dock-btn obs-tr flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-amber-bright"
         @click="emit('go', -1)"
       ><PhCaretLeft class="h-4 w-4" aria-hidden="true" /></button>
       <span class="px-1.5">
@@ -63,7 +67,7 @@ function focusOut(e) {
         type="button"
         :title="t('viewer.nextTitle')"
         :aria-label="t('viewer.next')"
-        class="obs-tr flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-amber-bright"
+        class="dock-btn obs-tr flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-amber-bright"
         @click="emit('go', 1)"
       ><PhCaretRight class="h-4 w-4" aria-hidden="true" /></button>
     </div>
@@ -71,8 +75,8 @@ function focusOut(e) {
 </template>
 
 <style scoped>
-/* Only devices that can hover get the retracting dock: 100% pushes it just off the bottom edge, and the hot zone or focus lifts it to 16px above the bottom.
-   On touch (hover: none) it stays out permanently. */
+/* Only a machine that can hover gets the retracting dock: 100% pushes it just off the bottom edge, and the hot zone or focus lifts it to 16px above the bottom.
+   Anywhere a finger is an input, the dock stays out permanently; the coarse rule comes last so it wins on a hybrid machine, matching the script. */
 .dock-inner {
   transform: translateY(-16px);
   transition: transform 180ms var(--ease-fluid);
@@ -80,5 +84,11 @@ function focusOut(e) {
 @media (hover: hover) {
   .dock-inner { transform: translateY(100%); }
   .dock[data-up="true"] .dock-inner { transform: translateY(-16px); }
+}
+@media (any-pointer: coarse) {
+  .dock-inner,
+  .dock[data-up="true"] .dock-inner { transform: translateY(-16px); }
+  /* A finger needs the full target even though the mark stays the same size. */
+  .dock-btn { height: 44px; width: 44px; }
 }
 </style>

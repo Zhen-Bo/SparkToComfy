@@ -7,16 +7,17 @@ decides which HTTP status each one becomes.
 
 import asyncio
 import json
-import logging
 import struct
+import time
 from urllib.parse import quote, urlparse
 
 import httpx
+import structlog
 import websockets
 
 from app.comfy.config import SETTINGS
 
-logger = logging.getLogger(__name__)
+logger = structlog.stdlib.get_logger(__name__)
 
 COMFY_URL = SETTINGS.url.rstrip("/")
 CLIENT_ID = "comfypanel-backend"
@@ -24,6 +25,8 @@ TIMEOUT = 30.0
 RETRY_FIRST = 1.0  # first reconnect backoff, in seconds
 RETRY_CAP = 30.0  # reconnect backoff ceiling, in seconds
 _LORA_PAGE = 100
+# The listing is read on every cover request, and ComfyUI pages it out slowly.
+_LORA_CACHE_SECONDS = 60.0
 _PREVIEW_EVENT = 4  # ComfyUI binary frame event type: preview image
 _TEXT_TYPES = frozenset(
     {
@@ -78,6 +81,7 @@ class ComfyClient:
             timeout=httpx.Timeout(timeout),
             transport=transport,
         )
+        self._loras: tuple[float, list[dict]] | None = None  # (expires_at, items)
 
     async def aclose(self) -> None:
         await self.http.aclose()
@@ -114,6 +118,8 @@ class ComfyClient:
         return resp.get(prompt_id)
 
     async def list_loras(self) -> list[dict]:
+        if self._loras is not None and self._loras[0] > time.monotonic():
+            return self._loras[1]
         first = await self._get_json("/api/lm/loras/list", {"page_size": _LORA_PAGE})
         items = list(first.get("items") or [])
         for page in range(2, (first.get("total_pages") or 1) + 1):
@@ -121,6 +127,7 @@ class ComfyClient:
                 "/api/lm/loras/list", {"page_size": _LORA_PAGE, "page": page}
             )
             items.extend(more.get("items") or [])
+        self._loras = (time.monotonic() + _LORA_CACHE_SECONDS, items)
         return items
 
     async def fetch_preview(self, preview_url: str) -> tuple[bytes, str]:
@@ -201,10 +208,10 @@ class ComfyClient:
             except (OSError, websockets.WebSocketException, TimeoutError) as err:
                 if not logged:
                     logger.warning(
-                        "ComfyUI connection failed (%s), retrying with backoff (cap %.0fs): %r",
-                        self.base_url,
-                        RETRY_CAP,
-                        err,
+                        "ComfyUI connection failed, retrying with backoff",
+                        url=self.base_url,
+                        cap_seconds=RETRY_CAP,
+                        error=repr(err),
                     )
                     logged = True
             await on_event("disconnected", {})

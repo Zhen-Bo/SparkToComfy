@@ -183,20 +183,22 @@ async def wait_receipt(ws, timeout=15):
         return m["promptId"]
 
 
+# The exact key set of every job message, by status.
+JOB_KEYS = {
+    "queued": {"type", "status", "position", "etaSeconds"},
+    "running": {"type", "status"},
+    "cancelled": {"type", "status"},
+    "done": {"type", "status", "images"},
+    "error": {"type", "status", "code"},
+}
+
+
 def assert_job_shape(m):
-    status = m["status"]
-    if status == "queued":
-        assert set(m) == {"type", "status", "position", "etaSeconds"}, m
+    assert m["status"] in JOB_KEYS, m
+    assert set(m) == JOB_KEYS[m["status"]], m
+    if m["status"] == "queued":
         assert isinstance(m["position"], int) and m["position"] >= 1, m
         assert m["etaSeconds"] is None or m["etaSeconds"] >= 0, m
-    elif status in {"running", "cancelled"}:
-        assert set(m) == {"type", "status"}, m
-    elif status == "done":
-        assert set(m) == {"type", "status", "images"}, m
-    elif status == "error":
-        assert set(m) == {"type", "status", "code"}, m
-    else:
-        raise AssertionError(m)
 
 
 async def wait_status(ws, status, timeout):
@@ -334,8 +336,8 @@ async def cancels(api_client, api2):
 
 
 async def test_generate_is_accepted(first_run):
-    assert first_run.accepted == (204, {}), first_run.accepted
-    assert first_run.fast == (204, {}), first_run.fast
+    assert first_run.accepted == (200, {"promptId": first_run.pid}), first_run.accepted
+    assert first_run.fast == (200, {"promptId": first_run.third}), first_run.fast
 
 
 async def test_second_generate_from_the_same_ip_is_rejected(first_run):
@@ -444,15 +446,17 @@ async def test_lora_cover(api_client):
 
 
 async def test_cancel_queued_job(cancels):
-    assert cancels.started == (204, {}), cancels.started
-    assert cancels.queued.accepted == (204, {}), cancels.queued.accepted
+    assert cancels.started == (200, {"promptId": cancels.a}), cancels.started
+    assert cancels.queued.accepted == (200, {"promptId": cancels.queued.pid}), (
+        cancels.queued.accepted
+    )
     assert cancels.queued.cancelled == (204, {}), cancels.queued.cancelled
     assert set(cancels.queued.msg) == {"type", "status"}, cancels.queued.msg
     assert cancels.rows_b == [], "a cancelled job must leave no DB row"
 
 
 async def test_cancel_releases_the_ip(cancels):
-    assert cancels.again.accepted == (204, {}), (
+    assert cancels.again.accepted == (200, {"promptId": cancels.again.pid}), (
         "cancelling must release the IP",
         cancels.again.accepted,
     )

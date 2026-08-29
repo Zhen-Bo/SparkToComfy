@@ -5,6 +5,7 @@
  * Opening or switching images fits the image (scale = minScale), the ceiling is 400% and the zoom factor is never displayed.
  * Zoom steps geometrically, x1.12 and /1.12, and the wheel anchors on the cursor, the way browsers and Figma do it.
  * The viewing margin is 16px on all four sides, because the dock floats and takes no layout space.
+ * Panning stops where the image edge meets the stage edge, so the image is always on screen and can never be lost.
 */
 
 import { computed, onMounted, onUnmounted, ref } from 'vue'
@@ -38,8 +39,9 @@ export function useZoomPan(dims) {
   })
   const frameStyle = computed(() => ({ width: `${frame.value.w}px`, height: `${frame.value.h}px` }))
 
-  /** The zoom floor is whatever fits the stage; it drops below 1 for a landscape image that would bleed at 100%. */
-  const minScale = computed(() => Math.min(1, Math.round(Math.min(stageW.value / frame.value.w, stageH.value / frame.value.h) * 100) / 100))
+  /** The zoom floor is whatever fits the stage; it drops below 1 for a landscape image that would bleed at 100%.
+   * Two decimals keep the readout steady, and the rounding goes down: rounding to nearest can land above the true fit and push the image past the margin. */
+  const minScale = computed(() => Math.min(1, Math.floor(Math.min(stageW.value / frame.value.w, stageH.value / frame.value.h) * 100) / 100))
 
   const transform = computed(() => `translate(${ox.value}px, ${oy.value}px) scale(${scale.value})`)
 
@@ -51,6 +53,15 @@ export function useZoomPan(dims) {
     scale.value = minScale.value
     ox.value = 0
     oy.value = 0
+  }
+
+  /** The offset ceiling is whatever the scaled image hides outside the stage.
+   * Once an edge reaches the stage edge there is nothing further to reveal, so the pan stops; an image smaller than the stage has a ceiling of zero and stays centred. */
+  function clampOffset() {
+    const maxX = Math.max(0, (frame.value.w * scale.value - stageW.value) / 2)
+    const maxY = Math.max(0, (frame.value.h * scale.value - stageH.value) / 2)
+    ox.value = Math.min(maxX, Math.max(-maxX, ox.value))
+    oy.value = Math.min(maxY, Math.max(-maxY, oy.value))
   }
 
   /**
@@ -69,10 +80,7 @@ export function useZoomPan(dims) {
       oy.value = Math.round(oy.value * k + (vy - cy) * (1 - k))
     }
     scale.value = next
-    if (next <= 1) {
-      ox.value = 0
-      oy.value = 0
-    }
+    clampOffset()
   }
 
   function onWheel(e) {
@@ -87,6 +95,7 @@ export function useZoomPan(dims) {
   function panBy(dx, dy) {
     ox.value += dx
     oy.value += dy
+    clampOffset()
   }
 
   function onPointerDown(e) {
@@ -121,6 +130,7 @@ export function useZoomPan(dims) {
     if (!dragging.value || !dragFrom) return
     ox.value = dragFrom.ox + (e.clientX - dragFrom.x)
     oy.value = dragFrom.oy + (e.clientY - dragFrom.y)
+    clampOffset()
   }
 
   /** Pinch zoom: the distance ratio times the starting scale, anchored on the midpoint between the fingers with the same formula as the wheel, and the midpoint tracks. */
@@ -137,6 +147,7 @@ export function useZoomPan(dims) {
     ox.value = pinchFrom.ox * k + (pinchFrom.cx - scx) * (1 - k) + (cx - pinchFrom.cx)
     oy.value = pinchFrom.oy * k + (pinchFrom.cy - scy) * (1 - k) + (cy - pinchFrom.cy)
     scale.value = next
+    clampOffset()
   }
 
   function onPointerUp(e) {
@@ -155,29 +166,23 @@ export function useZoomPan(dims) {
     if (pointers.size !== 0) return
     dragging.value = false
     dragFrom = null
-    if (scale.value <= 1) {
-      ox.value = 0
-      oy.value = 0
-    }
   }
 
   function onResize() {
+    // An image sitting at the fit was never zoomed by hand, so a new window size re-takes the fit rather than keeping a scale that no longer fills the stage.
+    const wasFitted = Math.abs(scale.value - minScale.value) < 1e-3
     winW.value = window.innerWidth
     winH.value = window.innerHeight
-    // Recompute the floor and clamp the current scale up to it if it fell below.
-    if (scale.value < minScale.value) scale.value = minScale.value
-    if (scale.value <= 1) {
-      ox.value = 0
-      oy.value = 0
-    }
+    if (wasFitted || scale.value < minScale.value) scale.value = minScale.value
+    clampOffset()
   }
 
   onMounted(() => window.addEventListener('resize', onResize))
   onUnmounted(() => window.removeEventListener('resize', onResize))
 
   return {
-    scale, ox, oy, dragging, pinching, gesturing,
-    frameStyle, transform, minScale,
+    scale, dragging, pinching, gesturing,
+    frameStyle, transform,
     fitToStage, zoom, panBy, onWheel, onPointerDown, onPointerMove, onPointerUp,
   }
 }

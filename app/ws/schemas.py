@@ -49,6 +49,12 @@ class SystemMessage(CustomModel):
     comfy_online: bool
 
 
+class PingMessage(CustomModel):
+    """Liveness only. A browser page cannot see the protocol-level pings uvicorn sends, so this is the frame it watches for."""
+
+    type: Literal["ping"] = "ping"
+
+
 # scripts/gen_ws_contract.py generates the frontend constants from here, so message types and job statuses are declared once.
 # A new terminal state is one more Literal on a class below and nothing to copy anywhere else.
 
@@ -61,6 +67,7 @@ WS_MESSAGES: tuple[type[CustomModel], ...] = (
     ProgressMessage,
     PreviewMessage,
     SystemMessage,
+    PingMessage,
 )
 
 

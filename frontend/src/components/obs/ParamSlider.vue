@@ -61,7 +61,7 @@ function onKey(e) {
 <template>
   <div>
     <div class="flex items-center gap-3">
-      <Slider v-model="inner" :min="min" :max="max" :step="step" class="flex-1" :aria-label="labelText" />
+      <Slider v-model="inner" :min="min" :max="max" :step="step" class="flex-1" :aria-label="labelText" :aria-valuetext="modelValue.toFixed(decimals)" />
       <input
         v-if="editing"
         ref="inputEl"

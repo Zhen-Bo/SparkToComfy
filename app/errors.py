@@ -1,7 +1,6 @@
-import logging
 import secrets
-from contextvars import ContextVar
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -9,10 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.models import CustomModel
 
-logger = logging.getLogger(__name__)
-
-REQUEST_ID: ContextVar[str] = ContextVar("request_id", default="-")
-REASON: ContextVar[str] = ContextVar("reason", default="")
+logger = structlog.stdlib.get_logger(__name__)
 
 CODES = {
     "bad_request",
@@ -54,13 +50,8 @@ def responses(*codes: int) -> dict[int | str, dict]:
 
 
 def set_reason(reason: str) -> None:
-    REASON.set(reason)
-
-
-class RequestIdFilter(logging.Filter):
-    def filter(self, record: logging.LogRecord) -> bool:
-        record.request_id = REQUEST_ID.get()
-        return True
+    """Attach the cause of a rejection to every log line of this request."""
+    structlog.contextvars.bind_contextvars(reason=reason)
 
 
 class RequestIdMiddleware:
@@ -69,8 +60,11 @@ class RequestIdMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            REQUEST_ID.set("req_" + secrets.token_hex(6))
-            REASON.set("")
+            # One connection serves many requests in turn, so the context is reset here, not only set.
+            structlog.contextvars.clear_contextvars()
+            structlog.contextvars.bind_contextvars(
+                request_id="req_" + secrets.token_hex(6)
+            )
         await self.app(scope, receive, send)
 
 
@@ -81,14 +75,20 @@ def _code(status_code: int, detail: object) -> str:
 
 
 def _respond(status_code: int, code: str) -> JSONResponse:
-    body = ErrorResponse(code=code, request_id=REQUEST_ID.get())
+    body = ErrorResponse(
+        code=code,
+        request_id=structlog.contextvars.get_contextvars().get("request_id", "-"),
+    )
     return JSONResponse(body.model_dump(by_alias=True), status_code=status_code)
 
 
-def _line(request: Request, status_code: int, code: str) -> str:
-    reason = REASON.get()
-    line = f"{status_code} {code} {request.method} {request.url.path}"
-    return f"{line} — {reason}" if reason else line
+def _fields(request: Request, status_code: int, code: str) -> dict[str, object]:
+    return {
+        "status": status_code,
+        "code": code,
+        "method": request.method,
+        "path": request.url.path,
+    }
 
 
 async def _on_http(request: Request, exc: Exception) -> JSONResponse:
@@ -96,29 +96,25 @@ async def _on_http(request: Request, exc: Exception) -> JSONResponse:
     detail = exc.detail if isinstance(exc, StarletteHTTPException) else None
     code = _code(status_code, detail)
     log = logger.error if status_code >= 500 else logger.warning
-    log(_line(request, status_code, code))
+    log("request failed", **_fields(request, status_code, code))
     return _respond(status_code, code)
 
 
 async def _on_validation(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, RequestValidationError):
-        set_reason(str(exc.errors()))
-    logger.warning(_line(request, 422, "unprocessable_content"))
+        # pydantic puts the offending value in each error, so only location and type may be logged.
+        set_reason(str([(e.get("loc"), e.get("type")) for e in exc.errors()]))
+        logger.debug("invalid request body", errors=exc.errors())
+    logger.warning("request failed", **_fields(request, 422, "unprocessable_content"))
     return _respond(422, "unprocessable_content")
 
 
 async def _on_unhandled(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception(_line(request, 500, "internal_error"))
+    logger.exception("request failed", **_fields(request, 500, "internal_error"))
     return _respond(500, "internal_error")
 
 
 def install(app: FastAPI) -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s [%(request_id)s] %(name)s: %(message)s",
-    )
-    for handler in logging.getLogger().handlers:
-        handler.addFilter(RequestIdFilter())
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(StarletteHTTPException, _on_http)
     app.add_exception_handler(RequestValidationError, _on_validation)

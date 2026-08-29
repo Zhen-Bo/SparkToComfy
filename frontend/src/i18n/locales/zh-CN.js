@@ -7,6 +7,7 @@ export default {
   },
   common: {
     value: '数值',
+    dismiss: '关闭这则讯息',
   },
   tabs: {
     aria: '控制分页',
@@ -55,6 +56,7 @@ export default {
     cancelQueue: '取消排队',
     cancelGeneration: '取消生成',
     busy: '生成中…',
+    tooNarrow: '窗口太窄',
   },
   queue: {
     ahead: '前方还有 {n} 个任务',
@@ -156,9 +158,7 @@ export default {
     nextTitle: '下一张（→）',
     imgAlt: '历史图 {n}：{width} × {height}',
     hintWheel: '滚轮 ─ 缩放',
-    hintReset: '0 ─ 重置',
     hintCopy: 'CTRL+C ─ 复制',
-    hintClose: 'ESC ─ 关闭',
     params: '图片参数',
     collapsePanel: '收合参数面板',
     expandPanel: '展开参数面板',
@@ -166,10 +166,11 @@ export default {
     backfill: '回填全部参数',
     size: '尺寸',
     steps: '步数',
-    quality: '品质 ─ {text}',
+    positive: '正面提示词 ─ {text}',
+    quality: '质量提示词 ─ {text}',
     sampler: '采样器',
     model: '模型',
-    negative: '负面 ─ {text}',
+    negative: '负面提示词 ─ {text}',
   },
   notify: {
     generateFailed: '生成失败 ─ {reason}',
@@ -198,6 +199,7 @@ export default {
     execution_failed: 'ComfyUI 执行出错',
     interrupted: '任务被中断',
     comfyui_offline: 'ComfyUI 中途离线',
+    job_lost: 'ComfyUI 弄丢了这个任务',
     image_load_failed: '成品图载入失败',
     network_error: '连不上后端',
     unexpected: '未预期的错误',

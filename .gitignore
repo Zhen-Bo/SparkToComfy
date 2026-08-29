@@ -9,6 +9,7 @@ __pycache__/
 data/
 .pytest_cache/
 .smell-check/
+.playwright-mcp/
 node_modules/
 dist/
 

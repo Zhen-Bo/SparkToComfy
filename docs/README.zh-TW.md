@@ -74,6 +74,7 @@ flowchart LR
 | `GET` | `/v1/workflows` | 取得後端設定的所有工作流和參數 |
 | `POST` | `/v1/generate` | 生成圖像 |
 | `POST` | `/v1/jobs/{promptId}/cancel` | 取消排隊中或生成中的工作 |
+| `GET` | `/v1/jobs/{promptId}` | 查一個工作的狀態：queued、running、done 或 error |
 | `GET` | `/v1/history` | 取得這個 session 的生成紀錄，上限 50 筆 |
 | `DELETE`  | `/v1/history` | 刪除屬於這個 session 的所有生成紀錄，軟刪除 |
 | `GET` | `/v1/images/{promptId}` | 輸出圖，後端直接轉接 ComfyUI 的 `/view` API |
@@ -144,7 +145,10 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.port` | `8000` | 應用預設 port |
 | `server.database` | `data/comfypanel.db` | 資料庫所在的位置 |
 | `server.docs` | `false` | 控制 `/docs`、`/redoc`、`/openapi.json` 開關 |
+| `server.log_level` | `INFO` | 日誌等級；`DEBUG` 會多印被拒絕的 prompt 與無效的請求內容 |
+| `server.log_format` | `console` | `console` 給人看，`json` 給日誌收集器，一行一個物件 |
 | `comfyui.url` | `http://127.0.0.1:8188` | ComfyUI API 運行位置 |
+| `reconcile.interval_seconds` | `10` | 多久比對一次 ComfyUI 佇列與進行中的工作；不見超過這段時間的工作視為遺失 |
 | `eta.upscale_seconds_per_megapixel` | `0.7` | 圖片放大額外等待係數，須根據顯卡與工作流自行調整 |
 | `rate_limit.enabled` | `false` | 是否開啟 rate limit |
 | `rate_limit.window_minutes` | `60` | Rate limit 間隔時間 |
@@ -193,7 +197,7 @@ config/
 ## 測試
 
 ```bash
-uv run pytest           # 75 個，不需要 ComfyUI
+uv run pytest           # 89 個，不需要 ComfyUI
 uv run pytest -m e2e    # 14 個，需要真實的 ComfyUI
 ```
 

@@ -1,12 +1,12 @@
 /** The lifecycle of one generation: submit, stage phase, progress, preview, outcome. */
 
 import { computed, reactive, watch } from 'vue'
-import { cancelJob, preloadImage, submitGeneration } from '@/api/comfy'
+import { cancelJob, fetchJob, preloadImage, submitGeneration } from '@/api/comfy'
 import { JOB_STATUS, JOB_STATUSES } from '@/api/ws-contract.generated'
 import { i18n } from '@/i18n'
 import { catalog, currentDims } from '@/stores/catalog'
 import { history, refreshHistory } from '@/stores/history'
-import { errorText, notify } from '@/stores/notify'
+import { errorText, notifyError } from '@/stores/notify'
 
 const { t } = i18n.global
 
@@ -72,7 +72,7 @@ export async function generate() {
   if (run.busy) return
   run.busy = true
   run.phase = 'preparing'
-  run.promptId = null // the receipt supplies the identity
+  run.promptId = null // the POST response supplies the identity; the receipt only repeats it
   run.progress = null
   run.previewFrame = null
   run.currentImage = null
@@ -81,7 +81,9 @@ export async function generate() {
   run.lastOutcome = null // a new run replaces the previous outcome
   run.lastRun = { workflowId: catalog.workflowId, params: JSON.parse(JSON.stringify(catalog.params)) }
   try {
-    await submitGeneration({ workflowId: catalog.workflowId, params: catalog.params })
+    const { promptId } = await submitGeneration({ workflowId: catalog.workflowId, params: catalog.params })
+    // The receipt may already have arrived over the socket; either source is fine, as long as this is still the same run.
+    if (run.busy && run.promptId === null) run.promptId = promptId
   } catch (err) {
     console.error('[generate] submit failed', err)
     run.lastOutcome = { kind: 'error', reason: errorText(err.code) }
@@ -99,7 +101,7 @@ export function retryLastRun() {
   const last = run.lastRun
   if (!last || run.busy) return
   if (!catalog.workflows.some((w) => w.id === last.workflowId)) {
-    return notify(t('notify.retryWorkflowGone'))
+    return notifyError(t('notify.retryWorkflowGone'))
   }
   catalog.workflowId = last.workflowId
   catalog.params = JSON.parse(JSON.stringify(last.params))
@@ -121,7 +123,7 @@ export async function cancelRun() {
     await cancelJob(run.promptId)
   } catch (err) {
     console.error('[cancel] submit failed', err)
-    notify(t('notify.cancelFailed', { reason: errorText(err.code) }))
+    notifyError(t('notify.cancelFailed', { reason: errorText(err.code) }))
   }
 }
 
@@ -152,17 +154,26 @@ async function finish(images) {
 }
 
 /**
- * A job that finished while we were disconnected.
- * The backend does not replay events, so history is the only way to tell.
- * Found means finish it; not found means it is still running, the receipt will arrive and there is nothing to do.
-*/
-export async function settleFromHistory() {
-  await refreshHistory()
-  const entry = history.entries.find((h) => h.promptId === run.promptId)
-  if (!entry) return
-  run.currentImage = entry.images[0]
-  writeBackSeed(history.entries)
-  resetRun()
+ * A job whose outcome may have passed while the socket was dead.
+ * The backend does not replay terminal messages, so its job record is the only way to tell.
+ * Still in flight: the replay that follows system re-attaches it, nothing to do here.
+ * Done or failed: finish it here exactly as the socket message would have.
+ * No record: a cancelled job leaves none.
+ */
+export async function settleFromServer() {
+  const promptId = run.promptId
+  if (promptId === null) return // the POST has not answered yet; it brings the id
+  let job
+  try {
+    job = await fetchJob(promptId)
+  } catch (err) {
+    if (err.status !== 404) return console.error('[run] job lookup failed', err)
+    job = { status: JOB_STATUS.CANCELLED }
+  }
+  // A socket message may have settled this run while the lookup was in flight.
+  if (!run.busy || run.promptId !== promptId) return
+  if (job.status === JOB_STATUS.QUEUED || job.status === JOB_STATUS.RUNNING) return
+  onJob(job.status === JOB_STATUS.ERROR ? { status: job.status, code: job.error } : job)
 }
 
 export function onReceipt({ promptId }) {

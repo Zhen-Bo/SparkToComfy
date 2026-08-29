@@ -74,6 +74,7 @@ flowchart LR
 | `GET` | `/v1/workflows` | Every workflow and its parameters, as configured on the backend |
 | `POST` | `/v1/generate` | Generate an image |
 | `POST` | `/v1/jobs/{promptId}/cancel` | Cancel a queued or running job |
+| `GET` | `/v1/jobs/{promptId}` | Where a job stands: queued, running, done or error |
 | `GET` | `/v1/history` | This session's records, capped at 50 |
 | `DELETE` | `/v1/history` | Delete every record belonging to this session, soft-deleted |
 | `GET` | `/v1/images/{promptId}` | An output image; the backend proxies ComfyUI's `/view` API straight through |
@@ -144,7 +145,10 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.port` | `8000` | The port the application binds to |
 | `server.database` | `data/comfypanel.db` | Where the database lives |
 | `server.docs` | `false` | Switch for `/docs`, `/redoc` and `/openapi.json` |
+| `server.log_level` | `INFO` | Log verbosity; `DEBUG` also prints rejected prompts and invalid request bodies |
+| `server.log_format` | `console` | `console` for people, `json` for a log collector, one object per line |
 | `comfyui.url` | `http://127.0.0.1:8188` | Where the ComfyUI API runs |
+| `reconcile.interval_seconds` | `10` | How often the ComfyUI queue is compared against the jobs in flight; a job unlisted for longer than this counts as lost |
 | `eta.upscale_seconds_per_megapixel` | `0.7` | Extra wait factor for upscaling; calibrate it for your GPU and workflow |
 | `rate_limit.enabled` | `false` | Whether rate limiting is on |
 | `rate_limit.window_minutes` | `60` | Rate limit window length |
@@ -194,7 +198,7 @@ Workflows reload every 30 seconds, so editing the YAML and adding a workflow bot
 ## Testing
 
 ```bash
-uv run pytest           # 75 tests, no ComfyUI needed
+uv run pytest           # 89 tests, no ComfyUI needed
 uv run pytest -m e2e    # 14 tests, needs a real ComfyUI
 ```
 

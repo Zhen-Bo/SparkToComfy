@@ -8,6 +8,9 @@ import { MESSAGE_TYPE } from '@/api/ws-contract.generated'
 
 const BASE = '/v1'
 
+/** Socket.IO's numbers: the backend sends a ping every 25 s (PING_SECONDS in app/main.py); 45 s without any frame means the socket is dead. */
+const PING_TIMEOUT_MS = 45000
+
 /** Where the history cap comes from: the backend sends it in a GET /v1/history response header, so the frontend keeps no copy of its own. */
 const LIMIT_HEADER = 'X-History-Limit'
 
@@ -72,8 +75,8 @@ export async function fetchHistory() {
 export const clearHistory = () =>
   request(`/history?sessionId=${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
 
-/** Returns as soon as the job is accepted, 204 with no body, without waiting for an image.
- * The receipt arrives over the WebSocket and every step after that is driven by WebSocket events. */
+/** Returns `{ promptId }` as soon as the job is accepted, without waiting for an image.
+ * Every step after that arrives over the WebSocket; the receipt repeats the id for a page that connects while the job is in flight. */
 export const submitGeneration = (payload) =>
   request('/generate', {
     method: 'POST',
@@ -87,6 +90,10 @@ export const cancelJob = (promptId) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId }),
   })
+
+/** Where a job stands right now: queued, running, done with images, or error with the reason. 404 means it left no record. */
+export const fetchJob = (promptId) =>
+  request(`/jobs/${encodeURIComponent(promptId)}?sessionId=${encodeURIComponent(sessionId)}`)
 
 export const loraCoverUrl = (file) => `${BASE}/lora/cover?lora=${encodeURIComponent(file)}`
 
@@ -106,6 +113,7 @@ export const preloadImage = (url) =>
  * State is rebuilt from the system, receipt and job messages of the new connection, because the backend does not replay events.
  * Shape conversion happens here: progress {value, max} becomes {step, total}, and a preview becomes a data URL.
  * The message type strings come from the generated contract file, never written by hand.
+ * A watchdog drops the socket when no frame arrives for 45 s, so a connection that died silently is replaced instead of trusted forever.
 */
 export function connectEvents(handlers) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -115,18 +123,9 @@ export function connectEvents(handlers) {
 
   const open = () => {
     const ws = new WebSocket(url)
-    // A bad frame is dropped on its own rather than letting the exception take the handler down.
-    // The connection itself is still covered by the backoff reconnect in onclose.
-    ws.onmessage = (e) => {
-      let msg
-      try {
-        msg = JSON.parse(e.data)
-      } catch {
-        return console.error('[ws] frame is not valid JSON, dropped', e.data)
-      }
-      dispatch(msg)
-    }
-    ws.onclose = () => {
+    let watchdog = null
+    const dropped = () => {
+      clearTimeout(watchdog)
       const nextRetryMs = Math.min(1000 * 2 ** attempts, 15000)
       attempts += 1
       // Report the drop and the next retry interval.
@@ -135,6 +134,30 @@ export function connectEvents(handlers) {
       clearTimeout(timer)
       timer = setTimeout(open, nextRetryMs)
     }
+    // A socket that died while the machine slept or the tunnel dropped stays OPEN in the browser; only the absence of frames tells.
+    // The browser can take a long time to run onclose for a dead socket, so the watchdog drops it itself instead of waiting.
+    const alive = () => {
+      clearTimeout(watchdog)
+      watchdog = setTimeout(() => {
+        ws.onmessage = ws.onclose = null
+        ws.close()
+        dropped()
+      }, PING_TIMEOUT_MS)
+    }
+    ws.onopen = alive
+    // A bad frame is dropped on its own rather than letting the exception take the handler down.
+    // The connection itself is still covered by the backoff reconnect in onclose.
+    ws.onmessage = (e) => {
+      alive()
+      let msg
+      try {
+        msg = JSON.parse(e.data)
+      } catch {
+        return console.error('[ws] frame is not valid JSON, dropped', e.data)
+      }
+      dispatch(msg)
+    }
+    ws.onclose = dropped
   }
 
   const dispatch = (msg) => {
@@ -153,6 +176,8 @@ export function connectEvents(handlers) {
       case MESSAGE_TYPE.SYSTEM:
         attempts = 0 // connected: the backoff resets, so the next drop starts again at 1s
         return handlers.onSystem?.({ comfyOnline: msg.comfyOnline })
+      case MESSAGE_TYPE.PING:
+        return // liveness only; the watchdog already counted the frame
     }
   }
 
