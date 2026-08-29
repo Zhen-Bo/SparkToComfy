@@ -8,6 +8,7 @@ export const MESSAGE_TYPE = Object.freeze({
   PROGRESS: 'progress',
   PREVIEW: 'preview',
   SYSTEM: 'system',
+  PING: 'ping',
 })
 
 export const JOB_STATUS = Object.freeze({

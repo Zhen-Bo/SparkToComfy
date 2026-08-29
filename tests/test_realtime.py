@@ -21,6 +21,7 @@ from conftest import AsgiWs, assert_camel
 from fastapi import HTTPException
 from sqlalchemy import select
 
+from app import main as app_main
 from app.comfy import client as comfy_client
 from app.database import JobRow, JobSubmission, now
 from app.jobs.config import RECONCILE
@@ -30,6 +31,7 @@ from app.jobs.schemas import GenerateRequest
 from app.ws import service as ws_service
 from app.ws.schemas import (
     JobQueuedMessage,
+    PingMessage,
     PreviewMessage,
     ProgressMessage,
     ReceiptMessage,
@@ -590,6 +592,47 @@ async def test_backlog_overflow_closes_only_the_jammed_connection(rt, comfy_onli
     await healthy.close()
     assert SLOW_C not in rt.hub.connections, rt.hub.connections
     assert box.task.done(), box.task
+
+
+# --- heartbeat ---
+
+PING_A = "ping-first"
+PING_B = "ping-second"
+PING_C = "ping-slow"
+
+
+async def test_heartbeat_reaches_every_connection(rt):
+    """The beat is what a browser watches; every live connection has to feel it."""
+    a, b = RecordingConn(), RecordingConn()
+    rt.hub.add_connection(PING_A, a)
+    rt.hub.add_connection(PING_B, b)
+    with mock.patch.object(app_main, "PING_SECONDS", 0.01):
+        task = asyncio.create_task(app_main._heartbeat_loop(rt.hub))
+        try:
+            for label, conn in (("a", a), ("b", b)):
+                await conn.wait_for(1, what="pings")
+                assert conn.received[0] == {"type": "ping"}, (label, conn.received)
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+            await rt.hub.remove_connection(PING_A, a)
+            await rt.hub.remove_connection(PING_B, b)
+
+
+async def test_ping_never_counts_against_the_backlog(rt):
+    """A connection nobody reads gets a ping every 25 s; it must never be what closes it."""
+    slow = RecordingConn(gated=True)
+    rt.hub.add_connection(PING_C, slow)
+    try:
+        for _ in range(3):
+            await rt.hub.send_to_session(PING_C, PingMessage())
+        box = rt.hub.connections[PING_C][slow]
+        assert box.events == 0, box.events
+        # The pump may hold the first ping already, waiting on the gate.
+        assert len(box.queue) <= 1, list(box.queue)
+    finally:
+        await rt.hub.remove_connection(PING_C, slow)
 
 
 # --- reconcile: a job that leaves the ComfyUI queue with no event ---

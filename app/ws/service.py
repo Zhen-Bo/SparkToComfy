@@ -14,8 +14,8 @@ from app.models import CustomModel
 logger = structlog.stdlib.get_logger(__name__)
 
 MAX_BACKLOG = 256
-# Only the newest of these two matters: a new one replaces the queued one and does not count against the backlog.
-_COALESCE = frozenset({"preview", "progress"})
+# Only the newest of these matters: a new one replaces the queued one and does not count against the backlog.
+_COALESCE = frozenset({"preview", "progress", "ping"})
 
 
 def _payload(message: CustomModel) -> tuple[str, str]:

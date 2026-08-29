@@ -24,6 +24,8 @@ from app.jobs.router import router as jobs_router
 from app.lora.router import router as lora_router
 from app.settings import ROOT
 from app.ws.router import router as ws_router
+from app.ws.schemas import PingMessage
+from app.ws.service import WsHub
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -58,6 +60,21 @@ async def _reconcile_loop(rt: runtime.Runtime) -> None:
             logger.exception("Reconcile pass failed, retrying on the next beat")
 
 
+# Socket.IO's pingInterval. The frontend watchdog (PING_TIMEOUT_MS in frontend/src/api/comfy.js) allows 45 s without a frame.
+PING_SECONDS = 25
+
+
+async def _heartbeat_loop(hub: WsHub) -> None:
+    """A frame the browser can see, on a fixed beat.
+
+    uvicorn pings every socket at the protocol level, but a page cannot observe those, so a socket
+    that died silently looks open to it forever. This frame is what its watchdog counts.
+    """
+    while True:
+        await asyncio.sleep(PING_SECONDS)
+        await hub.send_to_all(PingMessage())
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     rt = await runtime.build()
@@ -67,6 +84,7 @@ async def lifespan(_app: FastAPI):
         asyncio.create_task(rt.comfy.listen(rt.events.handle)),
         asyncio.create_task(_reload_loop(rt.catalog)),
         asyncio.create_task(_reconcile_loop(rt)),
+        asyncio.create_task(_heartbeat_loop(rt.hub)),
     ]
     yield
     for task in tasks:
