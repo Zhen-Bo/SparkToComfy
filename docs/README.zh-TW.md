@@ -197,7 +197,7 @@ config/
 ## 測試
 
 ```bash
-uv run pytest           # 75 個，不需要 ComfyUI
+uv run pytest           # 89 個，不需要 ComfyUI
 uv run pytest -m e2e    # 14 個，需要真實的 ComfyUI
 ```
 

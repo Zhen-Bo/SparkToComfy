@@ -198,7 +198,7 @@ Workflows reload every 30 seconds, so editing the YAML and adding a workflow bot
 ## Testing
 
 ```bash
-uv run pytest           # 75 tests, no ComfyUI needed
+uv run pytest           # 89 tests, no ComfyUI needed
 uv run pytest -m e2e    # 14 tests, needs a real ComfyUI
 ```
 
