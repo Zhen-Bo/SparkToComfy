@@ -7,6 +7,7 @@ export default {
   },
   common: {
     value: 'Value',
+    dismiss: 'Dismiss this message',
   },
   tabs: {
     aria: 'Control tabs',

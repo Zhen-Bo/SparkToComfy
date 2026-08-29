@@ -12,6 +12,9 @@ const NOTICE_MS = 2200
 
 export const toast = reactive({
   notice: null,
+  // A failure holds until the user closes it. 2.2 seconds is not evidence: look away once and the only account of what went wrong is gone,
+  // and nothing can bring it back. This is the same reason the stage keeps a standing outcome bar instead of a toast.
+  sticky: false,
 })
 
 // Error text lives in i18n under `errors.*`.
@@ -20,9 +23,28 @@ export const toast = reactive({
 export const errorText = (code) => (code && te(`errors.${code}`) ? t(`errors.${code}`) : (code ?? t('errors.unexpected')))
 
 let noticeTimer = null
+
+/** Something went right, or something the user just did. It leaves on its own. */
 export function notify(msg) {
-  toast.notice = msg
+  show(msg, false)
+}
+
+/** Something went wrong. It stays on screen with a close control until the user dismisses it or a newer notice replaces it. */
+export function notifyError(msg) {
+  show(msg, true)
+}
+
+export function dismissNotice() {
   clearTimeout(noticeTimer)
+  toast.notice = null
+  toast.sticky = false
+}
+
+function show(msg, sticky) {
+  clearTimeout(noticeTimer)
+  toast.notice = msg
+  toast.sticky = sticky
+  if (sticky) return
   noticeTimer = setTimeout(() => {
     toast.notice = null
   }, NOTICE_MS)

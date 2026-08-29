@@ -7,6 +7,7 @@ export default {
   },
   common: {
     value: '数值',
+    dismiss: '关闭这则讯息',
   },
   tabs: {
     aria: '控制分页',

@@ -5,7 +5,7 @@ import { connectEvents, fetchHistory, fetchWorkflows } from '@/api/comfy'
 import { i18n } from '@/i18n'
 import { catalog, selectWorkflow } from '@/stores/catalog'
 import { history } from '@/stores/history'
-import { errorText, notify } from '@/stores/notify'
+import { errorText, notifyError } from '@/stores/notify'
 import { onJob, onPreview, onProgress, onReceipt, run, settleFromServer } from '@/stores/run'
 
 const { t } = i18n.global
@@ -62,7 +62,7 @@ async function bootstrap() {
     if (limit !== null) history.limit = limit
   } catch (err) {
     console.error('[init] failed to load', err)
-    notify(t('notify.loadFailed', { reason: errorText(err.code) }))
+    notifyError(t('notify.loadFailed', { reason: errorText(err.code) }))
   }
 }
 

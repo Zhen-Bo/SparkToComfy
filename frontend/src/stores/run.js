@@ -6,7 +6,7 @@ import { JOB_STATUS, JOB_STATUSES } from '@/api/ws-contract.generated'
 import { i18n } from '@/i18n'
 import { catalog, currentDims } from '@/stores/catalog'
 import { history, refreshHistory } from '@/stores/history'
-import { errorText, notify } from '@/stores/notify'
+import { errorText, notifyError } from '@/stores/notify'
 
 const { t } = i18n.global
 
@@ -101,7 +101,7 @@ export function retryLastRun() {
   const last = run.lastRun
   if (!last || run.busy) return
   if (!catalog.workflows.some((w) => w.id === last.workflowId)) {
-    return notify(t('notify.retryWorkflowGone'))
+    return notifyError(t('notify.retryWorkflowGone'))
   }
   catalog.workflowId = last.workflowId
   catalog.params = JSON.parse(JSON.stringify(last.params))
@@ -123,7 +123,7 @@ export async function cancelRun() {
     await cancelJob(run.promptId)
   } catch (err) {
     console.error('[cancel] submit failed', err)
-    notify(t('notify.cancelFailed', { reason: errorText(err.code) }))
+    notifyError(t('notify.cancelFailed', { reason: errorText(err.code) }))
   }
 }
 

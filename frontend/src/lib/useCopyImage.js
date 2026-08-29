@@ -5,7 +5,7 @@
 */
 
 import { useI18n } from 'vue-i18n'
-import { notify } from '@/stores/notify'
+import { notify, notifyError } from '@/stores/notify'
 
 export function useCopyImage() {
   const { t } = useI18n()
@@ -14,7 +14,7 @@ export function useCopyImage() {
   async function toClipboard(src) {
     if (copying) return
     if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
-      return notify(t('notify.copyUnsupported'))
+      return notifyError(t('notify.copyUnsupported'))
     }
     copying = true
     try {
@@ -32,7 +32,7 @@ export function useCopyImage() {
       notify(t('notify.copied'))
     } catch (err) {
       console.error('[copy] failed to copy the image', err)
-      notify(t('notify.copyDenied'))
+      notifyError(t('notify.copyDenied'))
     } finally {
       copying = false
     }

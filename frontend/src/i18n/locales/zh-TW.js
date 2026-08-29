@@ -11,6 +11,7 @@ export default {
   },
   common: {
     value: '數值', // 裸控件的無障礙名稱預設（ui/Slider、obs/ParamSlider）
+    dismiss: '關閉這則訊息',
   },
   tabs: {
     aria: '控制分頁',

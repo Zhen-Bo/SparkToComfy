@@ -5,7 +5,7 @@ import { reactive } from 'vue'
 import { clearHistory as clearHistoryApi, fetchHistory } from '@/api/comfy'
 import { INTL_LOCALE, i18n } from '@/i18n'
 import { catalog, sizeOf } from '@/stores/catalog'
-import { errorText, notify } from '@/stores/notify'
+import { errorText, notify, notifyError } from '@/stores/notify'
 import { run } from '@/stores/run'
 
 const { t } = i18n.global
@@ -28,7 +28,7 @@ export async function refreshHistory() {
     if (limit !== null) history.limit = limit
   } catch (err) {
     console.error('[history] failed to load', err)
-    notify(t('notify.historyLoadFailed', { reason: errorText(err.code) }))
+    notifyError(t('notify.historyLoadFailed', { reason: errorText(err.code) }))
   }
 }
 
@@ -36,9 +36,9 @@ export async function refreshHistory() {
     Not while generating: restoring swaps the workflow and the size, the viewfinder aspect ratio follows, and preview frames still arriving at the old ratio would be forced into the new frame.
     This is the reason RatioSelector locks too, and guarding at the write point is what covers every entry into it. */
 export function restoreFromHistory(entry) {
-  if (run.busy) return notify(t('notify.restoreBusy'))
+  if (run.busy) return notifyError(t('notify.restoreBusy'))
   if (!catalog.workflows.some((w) => w.id === entry.workflowId)) {
-    return notify(t('notify.workflowGone'))
+    return notifyError(t('notify.workflowGone'))
   }
   catalog.workflowId = entry.workflowId
   // Deep copy through JSON: entry is a reactive proxy and structuredClone rejects proxies, while params is JSON data to begin with.
@@ -65,6 +65,6 @@ export async function clearHistory() {
     notify(t('notify.cleared'))
   } catch (err) {
     console.error('[history] failed to clear', err)
-    notify(t('notify.historyClearFailed', { reason: errorText(err.code) }))
+    notifyError(t('notify.historyClearFailed', { reason: errorText(err.code) }))
   }
 }
