@@ -74,6 +74,7 @@ flowchart LR
 | `GET` | `/v1/workflows` | Every workflow and its parameters, as configured on the backend |
 | `POST` | `/v1/generate` | Generate an image |
 | `POST` | `/v1/jobs/{promptId}/cancel` | Cancel a queued or running job |
+| `GET` | `/v1/jobs/{promptId}` | Where a job stands: queued, running, done or error |
 | `GET` | `/v1/history` | This session's records, capped at 50 |
 | `DELETE` | `/v1/history` | Delete every record belonging to this session, soft-deleted |
 | `GET` | `/v1/images/{promptId}` | An output image; the backend proxies ComfyUI's `/view` API straight through |

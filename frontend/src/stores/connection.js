@@ -6,7 +6,7 @@ import { i18n } from '@/i18n'
 import { catalog, selectWorkflow } from '@/stores/catalog'
 import { history } from '@/stores/history'
 import { errorText, notify } from '@/stores/notify'
-import { onJob, onPreview, onProgress, onReceipt, run, settleFromHistory } from '@/stores/run'
+import { onJob, onPreview, onProgress, onReceipt, run, settleFromServer } from '@/stores/run'
 
 const { t } = i18n.global
 
@@ -23,7 +23,7 @@ export const connection = reactive({
 })
 
 /* system always arrives first on a connect, so it is the signal that we are connected.
-   If a run is still busy, history is checked once: found means it finished while we were disconnected, so the image completes; not found means it is still running and we wait for the receipt. */
+   If a run is still busy, the backend's job record is checked once: finished means the outcome passed while we were disconnected, so it completes here; still in flight means the replay that follows re-attaches it. */
 function onSystem({ comfyOnline }) {
   connection.comfyOnline = comfyOnline
   connection.wsOnline = true
@@ -37,7 +37,7 @@ function onSystem({ comfyOnline }) {
     // The socket is up but the engine went down: offline starts counting here.
     connection.offlineSince = Date.now()
   }
-  if (run.busy) settleFromHistory()
+  if (run.busy) settleFromServer()
 }
 
 function onWSClose({ nextRetryMs } = {}) {

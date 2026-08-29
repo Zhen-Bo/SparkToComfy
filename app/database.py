@@ -117,6 +117,24 @@ class Database:
 
     # --- reads ---
 
+    async def get_job(self, session_id: str, prompt_id: str) -> dict | None:
+        """The finished record of one job of this session: status, image refs, error text."""
+        async with self.session() as session:
+            row = await session.scalar(
+                select(JobRow).where(
+                    JobRow.session_id == session_id,
+                    JobRow.prompt_id == prompt_id,
+                    JobRow.deleted_at.is_(None),
+                )
+            )
+        if row is None:
+            return None
+        return {
+            "status": row.status,
+            "images": json.loads(row.images or "[]"),
+            "error": row.error,
+        }
+
     async def has_done(self, session_id: str, prompt_id: str) -> bool:
         async with self.session() as session:
             found = await session.scalar(

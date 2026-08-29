@@ -74,6 +74,7 @@ flowchart LR
 | `GET` | `/v1/workflows` | 取得後端設定的所有工作流和參數 |
 | `POST` | `/v1/generate` | 生成圖像 |
 | `POST` | `/v1/jobs/{promptId}/cancel` | 取消排隊中或生成中的工作 |
+| `GET` | `/v1/jobs/{promptId}` | 查一個工作的狀態：queued、running、done 或 error |
 | `GET` | `/v1/history` | 取得這個 session 的生成紀錄，上限 50 筆 |
 | `DELETE`  | `/v1/history` | 刪除屬於這個 session 的所有生成紀錄，軟刪除 |
 | `GET` | `/v1/images/{promptId}` | 輸出圖，後端直接轉接 ComfyUI 的 `/view` API |

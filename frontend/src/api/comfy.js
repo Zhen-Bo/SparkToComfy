@@ -72,8 +72,8 @@ export async function fetchHistory() {
 export const clearHistory = () =>
   request(`/history?sessionId=${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
 
-/** Returns as soon as the job is accepted, 204 with no body, without waiting for an image.
- * The receipt arrives over the WebSocket and every step after that is driven by WebSocket events. */
+/** Returns `{ promptId }` as soon as the job is accepted, without waiting for an image.
+ * Every step after that arrives over the WebSocket; the receipt repeats the id for a page that connects while the job is in flight. */
 export const submitGeneration = (payload) =>
   request('/generate', {
     method: 'POST',
@@ -87,6 +87,10 @@ export const cancelJob = (promptId) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sessionId }),
   })
+
+/** Where a job stands right now: queued, running, done with images, or error with the reason. 404 means it left no record. */
+export const fetchJob = (promptId) =>
+  request(`/jobs/${encodeURIComponent(promptId)}?sessionId=${encodeURIComponent(sessionId)}`)
 
 export const loraCoverUrl = (file) => `${BASE}/lora/cover?lora=${encodeURIComponent(file)}`
 

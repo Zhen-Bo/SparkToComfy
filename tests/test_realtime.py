@@ -293,6 +293,47 @@ async def test_comfyui_rejection_keeps_the_prompt_out_of_the_warning(
     assert any("SECRET_PROMPT_TEXT" in m for m in debug), debug
 
 
+RECEIPT_SESSION = "s-receipt"
+RECEIPT_IP = "127.0.0.31"
+
+
+async def test_generate_answers_with_the_receipt_id(rt, comfy_online, example_values):
+    """The HTTP answer and the receipt frame must name the same job."""
+    conn = RecordingConn()
+    rt.hub.add_connection(RECEIPT_SESSION, conn)
+    body = GenerateRequest.model_validate(
+        {
+            "workflow_id": "example",
+            "session_id": RECEIPT_SESSION,
+            "params": example_values,
+        },
+        by_name=True,
+    )
+    request = SimpleNamespace(client=SimpleNamespace(host=RECEIPT_IP))
+    result = None
+    try:
+        with (
+            mock.patch.object(
+                rt.comfy, "submit_prompt", mock.AsyncMock(return_value={})
+            ),
+            mock.patch.object(
+                rt.comfy,
+                "get_queue",
+                mock.AsyncMock(return_value={"queue_running": [], "queue_pending": []}),
+            ),
+        ):
+            result = await generate(body, request, rt)  # pyright: ignore[reportArgumentType]
+        assert result.prompt_id, result
+        await conn.wait_for(1, what="receipts")
+        assert conn.received[0] == {"type": "receipt", "promptId": result.prompt_id}, (
+            conn.received
+        )
+    finally:
+        if result is not None and rt.registry.get(result.prompt_id) is not None:
+            rt.registry.remove(result.prompt_id)
+        await rt.hub.remove_connection(RECEIPT_SESSION, conn)
+
+
 async def test_reconnect_brings_comfy_back_online(rt):
     conn = RecordingConn()
     rt.hub.add_connection(OFF_SESSION, conn)
@@ -548,6 +589,67 @@ async def test_backlog_overflow_closes_only_the_jammed_connection(rt, comfy_onli
     await healthy.close()
     assert SLOW_C not in rt.hub.connections, rt.hub.connections
     assert box.task.done(), box.task
+
+
+# --- job status: what a page asks after a reconnect ---
+
+STATUS_SESSION = "s-jobstatus"
+STATUS_IP = "127.0.0.41"
+
+
+async def test_job_status_endpoint(client, rt, example_values):
+    unknown = await client.get(
+        f"/v1/jobs/{uuid.uuid4().hex}?sessionId={STATUS_SESSION}"
+    )
+    assert unknown.status_code == 404, unknown.text
+    assert unknown.json()["code"] == "not_found", unknown.text
+
+    flight = "flight-" + uuid.uuid4().hex
+    assert rt.registry.reserve_ip(STATUS_IP, flight) is None
+    rt.registry.add_job(make_job(flight, STATUS_SESSION, STATUS_IP, example_values))
+    try:
+        queued = await client.get(f"/v1/jobs/{flight}?sessionId={STATUS_SESSION}")
+        assert queued.status_code == 200, queued.text
+        assert queued.json() == {"status": "queued", "images": [], "error": None}, (
+            queued.text
+        )
+        assert_camel(queued.json(), "queued")
+
+        stranger = await client.get(f"/v1/jobs/{flight}?sessionId=someone-else")
+        assert stranger.status_code == 404, stranger.text
+
+        rt.registry.get(flight).status = "running"
+        running = await client.get(f"/v1/jobs/{flight}?sessionId={STATUS_SESSION}")
+        assert running.json()["status"] == "running", running.text
+        assert_camel(running.json(), "running")
+    finally:
+        rt.registry.remove(flight)
+
+    finished = "done-" + uuid.uuid4().hex
+    job = make_job(finished, STATUS_SESSION, STATUS_IP, example_values)
+    await rt.db.insert_finished(
+        job.submission,
+        "done",
+        images=[{"filename": "a.png", "subfolder": "", "type": "output"}],
+    )
+    done = await client.get(f"/v1/jobs/{finished}?sessionId={STATUS_SESSION}")
+    assert done.status_code == 200, done.text
+    assert done.json() == {
+        "status": "done",
+        "images": [f"/v1/images/{finished}?index=0"],
+        "error": None,
+    }, done.text
+    assert_camel(done.json(), "done")
+
+    broken = "error-" + uuid.uuid4().hex
+    job = make_job(broken, STATUS_SESSION, STATUS_IP, example_values)
+    await rt.db.insert_finished(job.submission, "error", error="boom")
+    failed = await client.get(f"/v1/jobs/{broken}?sessionId={STATUS_SESSION}")
+    assert failed.status_code == 200, failed.text
+    assert failed.json() == {"status": "error", "images": [], "error": "boom"}, (
+        failed.text
+    )
+    assert_camel(failed.json(), "error")
 
 
 # --- body limit: a request bigger than any legitimate one is refused before it is read ---

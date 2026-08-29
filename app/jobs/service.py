@@ -75,7 +75,7 @@ class JobsService:
             upscale=values["upscale"],
         )
 
-    async def submit(self, body: GenerateRequest, ip: str) -> None:
+    async def submit(self, body: GenerateRequest, ip: str) -> str:
         wf, values = self._accept(body)
         job = self._build_job(body, wf["parameters"], values, ip)
         active = self.ctx.registry.reserve_ip(job.ip, job.prompt_id)
@@ -119,6 +119,7 @@ class JobsService:
             workflow=body.workflow_id,
         )
         await self.events.refresh_positions()
+        return job.prompt_id
 
     async def cancel(self, prompt_id: str, session_id: str) -> None:
         job = self.ctx.registry.get(prompt_id)
