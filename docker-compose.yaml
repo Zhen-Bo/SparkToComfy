@@ -12,6 +12,10 @@ services:
       COMFYUI__URL: http://host.docker.internal:8188
       # Console log timestamps use the container's clock, which is UTC unless the host's zone is named here.
       TZ: Asia/Taipei
+      # A reverse proxy in front of the panel makes every request arrive from the Docker bridge gateway, which collapses all callers into one address and jams the per-IP job limit.
+      # Trusting the bridge range lets uvicorn take the real client address from `X-Forwarded-For` instead.
+      # Never widen this to `*`: uvicorn then reads the leftmost entry, which the caller writes and can forge.
+      FORWARDED_ALLOW_IPS: "172.16.0.0/12"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

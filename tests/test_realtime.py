@@ -548,3 +548,15 @@ async def test_backlog_overflow_closes_only_the_jammed_connection(rt, comfy_onli
     await healthy.close()
     assert SLOW_C not in rt.hub.connections, rt.hub.connections
     assert box.task.done(), box.task
+
+
+# --- body limit: a request bigger than any legitimate one is refused before it is read ---
+
+
+async def test_oversized_body_is_refused(client):
+    resp = await client.post(
+        "/v1/generate",
+        content=b"{" + b" " * (64 * 1024) + b"}",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 413, resp.status_code

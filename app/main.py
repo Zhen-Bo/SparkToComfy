@@ -14,6 +14,7 @@ import yaml
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from app import config, errors, log, runtime
 from app.config import WorkflowCatalog
@@ -28,6 +29,8 @@ from app.ws.router import router as ws_router
 logger = structlog.stdlib.get_logger(__name__)
 
 RELOAD_SECONDS = 30
+# Request bodies are JSON parameters, a few KB at most.
+MAX_BODY_BYTES = 64 * 1024
 UI_DIR = ROOT / "frontend" / "dist"
 
 
@@ -72,6 +75,7 @@ api.include_router(images_router)
 api.include_router(ws_router)
 
 app = FastAPI(lifespan=lifespan, openapi_url=None)
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=MAX_BODY_BYTES)
 app.mount("/v1", api)
 
 if UI_DIR.is_dir():
