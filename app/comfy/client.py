@@ -24,8 +24,6 @@ CLIENT_ID = "comfypanel-backend"
 TIMEOUT = 30.0
 RETRY_FIRST = 1.0  # first reconnect backoff, in seconds
 RETRY_CAP = 30.0  # reconnect backoff ceiling, in seconds
-# A running job streams events; a stream this silent during one has lost its clientId slot.
-DEAF_SECONDS = 30.0
 _LORA_PAGE = 100
 # The listing is read on every cover request, and ComfyUI pages it out slowly.
 _LORA_CACHE_SECONDS = 60.0
@@ -84,9 +82,6 @@ class ComfyClient:
             transport=transport,
         )
         self._loras: tuple[float, list[dict]] | None = None  # (expires_at, items)
-        self._socket: websockets.ClientConnection | None = None
-        self._last_frame = time.monotonic()
-        self._kicked = False
 
     async def aclose(self) -> None:
         await self.http.aclose()
@@ -182,42 +177,19 @@ class ComfyClient:
         if kind in _TEXT_TYPES:
             await on_event(kind, msg.get("data") or {})
 
-    def silent_seconds(self) -> float:
-        """How long ago the last frame arrived on the event stream."""
-        return time.monotonic() - self._last_frame
-
-    async def kick(self) -> None:
-        """Drop the event stream so listen() rebuilds it, without the disconnected event.
-
-        ComfyUI keys its sockets by clientId, and the late cleanup of a dead predecessor
-        connection with the same clientId can evict the live socket from that map. The TCP
-        connection stays healthy, so only reconnecting re-registers the clientId.
-        """
-        socket = self._socket
-        if socket is None:
-            return
-        self._kicked = True
-        await socket.close()
-
     async def _run_connection(self, on_event) -> None:
         async with websockets.connect(_ws_url(self.base_url), max_size=None) as socket:
-            self._socket = socket
-            self._last_frame = time.monotonic()
-            try:
-                await socket.send(
-                    json.dumps(
-                        {
-                            "type": "feature_flags",
-                            "data": {"supports_preview_metadata": True},
-                        }
-                    )
+            await socket.send(
+                json.dumps(
+                    {
+                        "type": "feature_flags",
+                        "data": {"supports_preview_metadata": True},
+                    }
                 )
-                await on_event("connected", {})
-                async for raw in socket:
-                    self._last_frame = time.monotonic()
-                    await self._on_message(on_event, raw)
-            finally:
-                self._socket = None
+            )
+            await on_event("connected", {})
+            async for raw in socket:
+                await self._on_message(on_event, raw)
 
     async def listen(self, on_event) -> None:
         """Read while connected, back off and reconnect when dropped.
@@ -242,10 +214,6 @@ class ComfyClient:
                         error=repr(err),
                     )
                     logged = True
-            # A kick is a deliberate rebuild of a healthy-looking connection: announcing it as a
-            # disconnect would fail every job in flight for a link that is about to come back.
-            kicked, self._kicked = self._kicked, False
-            if not kicked:
-                await on_event("disconnected", {})
+            await on_event("disconnected", {})
             await asyncio.sleep(delay)
             delay = min(delay * 2, RETRY_CAP)
