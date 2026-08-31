@@ -9,6 +9,7 @@ import asyncio
 import json
 import struct
 import time
+import uuid
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -20,7 +21,6 @@ from app.comfy.config import SETTINGS
 logger = structlog.stdlib.get_logger(__name__)
 
 COMFY_URL = SETTINGS.url.rstrip("/")
-CLIENT_ID = "comfypanel-backend"
 TIMEOUT = 30.0
 RETRY_FIRST = 1.0  # first reconnect backoff, in seconds
 RETRY_CAP = 30.0  # reconnect backoff ceiling, in seconds
@@ -47,10 +47,10 @@ class ComfyError(Exception):
         self.payload = payload
 
 
-def _ws_url(http_url: str) -> str:
+def _ws_url(http_url: str, client_id: str) -> str:
     parsed = urlparse(http_url)
     scheme = "wss" if parsed.scheme == "https" else "ws"
-    return f"{scheme}://{parsed.netloc}/ws?clientId={CLIENT_ID}"
+    return f"{scheme}://{parsed.netloc}/ws?clientId={client_id}"
 
 
 def collect_images(hist: dict) -> list[dict]:
@@ -82,6 +82,7 @@ class ComfyClient:
             transport=transport,
         )
         self._loras: tuple[float, list[dict]] | None = None  # (expires_at, items)
+        self.client_id = uuid.uuid4().hex
 
     async def aclose(self) -> None:
         await self.http.aclose()
@@ -96,7 +97,11 @@ class ComfyClient:
     async def submit_prompt(self, prompt: dict, prompt_id: str) -> dict:
         resp = await self.http.post(
             "/api/prompt",
-            json={"prompt": prompt, "client_id": CLIENT_ID, "prompt_id": prompt_id},
+            json={
+                "prompt": prompt,
+                "client_id": self.client_id,
+                "prompt_id": prompt_id,
+            },
         )
         if resp.status_code == 400:
             raise ComfyError(resp.json())
@@ -178,7 +183,10 @@ class ComfyClient:
             await on_event(kind, msg.get("data") or {})
 
     async def _run_connection(self, on_event) -> None:
-        async with websockets.connect(_ws_url(self.base_url), max_size=None) as socket:
+        self.client_id = uuid.uuid4().hex
+        async with websockets.connect(
+            _ws_url(self.base_url, self.client_id), max_size=None
+        ) as socket:
             await socket.send(
                 json.dumps(
                     {

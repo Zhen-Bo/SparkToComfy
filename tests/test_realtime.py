@@ -337,6 +337,42 @@ async def test_generate_answers_with_the_receipt_id(rt, comfy_online, example_va
         await rt.hub.remove_connection(RECEIPT_SESSION, conn)
 
 
+async def test_each_connection_presents_a_fresh_client_id():
+    """A reused clientId lets one connection silently evict another from ComfyUI's routing
+    table (two backends against one engine, or a reconnect racing its dead predecessor)."""
+    from urllib.parse import parse_qs, urlparse
+
+    seen = []
+    got_two = asyncio.Event()
+
+    async def handler(conn):
+        seen.append(parse_qs(urlparse(conn.request.path).query)["clientId"][0])
+        if len(seen) >= 2:
+            got_two.set()
+        await conn.close()
+
+    async def on_event(kind, data):
+        pass
+
+    server = await websockets.serve(handler, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    stub = comfy_client.ComfyClient(f"http://127.0.0.1:{port}")
+    task = asyncio.create_task(stub.listen(on_event))
+    try:
+        await asyncio.wait_for(got_two.wait(), timeout=10)
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        await stub.aclose()
+        server.close()
+        await server.wait_closed()
+    first, second = seen[:2]
+    assert first and second, seen
+    assert first != second, "a reconnect must never reuse the previous clientId"
+    assert stub.client_id == seen[-1], "submit_prompt must use the live connection's id"
+
+
 async def test_reconnect_brings_comfy_back_online(rt):
     conn = RecordingConn()
     rt.hub.add_connection(OFF_SESSION, conn)
