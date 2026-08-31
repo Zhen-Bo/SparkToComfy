@@ -90,10 +90,8 @@ class RecordingConn:
         return self.received
 
 
-async def fake_comfy(port, on_connect=None):
+async def fake_comfy(port):
     async def handler(conn):
-        if on_connect is not None:
-            on_connect()
         async for _ in conn:
             pass
 
@@ -101,9 +99,9 @@ async def fake_comfy(port, on_connect=None):
 
 
 @asynccontextmanager
-async def comfy_link(rt, on_connect=None):
+async def comfy_link(rt):
     """Run an in-process fake ComfyUI WebSocket server, point the runtime at it and listen."""
-    server = await fake_comfy(0, on_connect)
+    server = await fake_comfy(0)
     port = server.sockets[0].getsockname()[1]
     stub = comfy_client.ComfyClient(f"http://127.0.0.1:{port}")
     original, rt.ctx.comfy = rt.ctx.comfy, stub
@@ -339,47 +337,48 @@ async def test_generate_answers_with_the_receipt_id(rt, comfy_online, example_va
         await rt.hub.remove_connection(RECEIPT_SESSION, conn)
 
 
+async def test_each_connection_presents_a_fresh_client_id():
+    """A reused clientId lets one connection silently evict another from ComfyUI's routing
+    table (two backends against one engine, or a reconnect racing its dead predecessor)."""
+    from urllib.parse import parse_qs, urlparse
+
+    seen = []
+    got_two = asyncio.Event()
+
+    async def handler(conn):
+        seen.append(parse_qs(urlparse(conn.request.path).query)["clientId"][0])
+        if len(seen) >= 2:
+            got_two.set()
+        await conn.close()
+
+    async def on_event(kind, data):
+        pass
+
+    server = await websockets.serve(handler, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    stub = comfy_client.ComfyClient(f"http://127.0.0.1:{port}")
+    task = asyncio.create_task(stub.listen(on_event))
+    try:
+        await asyncio.wait_for(got_two.wait(), timeout=10)
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+        await stub.aclose()
+        server.close()
+        await server.wait_closed()
+    first, second = seen[:2]
+    assert first and second, seen
+    assert first != second, "a reconnect must never reuse the previous clientId"
+    assert stub.client_id == seen[-1], "submit_prompt must use the live connection's id"
+
+
 async def test_reconnect_brings_comfy_back_online(rt):
     conn = RecordingConn()
     rt.hub.add_connection(OFF_SESSION, conn)
     async with comfy_link(rt):
         await conn.wait_for(1, what="online messages")
     assert conn.received == [{"type": "system", "comfyOnline": True}], conn.received
-
-
-async def test_silent_stream_while_running_reconnects_without_offline(
-    rt, example_values
-):
-    """A stream that stays silent while a job runs means ComfyUI evicted our clientId socket.
-
-    The reconcile pass must rebuild the connection so the clientId is registered again, and the
-    rebuild must not take the offline path: the job stays in flight and no client hears offline.
-    """
-    conn = RecordingConn()
-    pid = "deaf-" + uuid.uuid4().hex
-    connected = asyncio.Event()
-    async with watching(rt, "deaf-watch") as watcher:
-        async with comfy_link(rt, on_connect=connected.set):
-            await watcher.wait_for(1, what="online broadcasts")
-            rt.hub.add_connection(OFF_SESSION, conn)
-            assert rt.registry.reserve_ip(OFF_IP, pid) is None
-            job = make_job(pid, OFF_SESSION, OFF_IP, example_values)
-            job.status = "running"
-            rt.registry.add_job(job)
-            queue = {"queue_running": [[0, pid]], "queue_pending": []}
-            with mock.patch.object(
-                rt.comfy, "get_queue", mock.AsyncMock(return_value=queue)
-            ):
-                connected.clear()
-                rt.comfy._last_frame -= comfy_client.DEAF_SECONDS + 1
-                await rt.events.refresh_positions()
-                await asyncio.wait_for(connected.wait(), timeout=10)
-            assert rt.queue.online, "a kick must never look like going offline"
-            assert rt.registry.get(pid) is not None, "the job must stay in flight"
-            assert conn.received == [], conn.received
-        assert watcher.received == [{"type": "system", "comfyOnline": True}], (
-            watcher.received
-        )
 
 
 class Terminal(NamedTuple):

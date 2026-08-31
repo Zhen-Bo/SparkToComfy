@@ -9,6 +9,7 @@ import asyncio
 import json
 import struct
 import time
+import uuid
 from urllib.parse import quote, urlparse
 
 import httpx
@@ -20,12 +21,9 @@ from app.comfy.config import SETTINGS
 logger = structlog.stdlib.get_logger(__name__)
 
 COMFY_URL = SETTINGS.url.rstrip("/")
-CLIENT_ID = "comfypanel-backend"
 TIMEOUT = 30.0
 RETRY_FIRST = 1.0  # first reconnect backoff, in seconds
 RETRY_CAP = 30.0  # reconnect backoff ceiling, in seconds
-# A running job streams events; a stream this silent during one has lost its clientId slot.
-DEAF_SECONDS = 30.0
 _LORA_PAGE = 100
 # The listing is read on every cover request, and ComfyUI pages it out slowly.
 _LORA_CACHE_SECONDS = 60.0
@@ -49,10 +47,10 @@ class ComfyError(Exception):
         self.payload = payload
 
 
-def _ws_url(http_url: str) -> str:
+def _ws_url(http_url: str, client_id: str) -> str:
     parsed = urlparse(http_url)
     scheme = "wss" if parsed.scheme == "https" else "ws"
-    return f"{scheme}://{parsed.netloc}/ws?clientId={CLIENT_ID}"
+    return f"{scheme}://{parsed.netloc}/ws?clientId={client_id}"
 
 
 def collect_images(hist: dict) -> list[dict]:
@@ -84,9 +82,7 @@ class ComfyClient:
             transport=transport,
         )
         self._loras: tuple[float, list[dict]] | None = None  # (expires_at, items)
-        self._socket: websockets.ClientConnection | None = None
-        self._last_frame = time.monotonic()
-        self._kicked = False
+        self.client_id = uuid.uuid4().hex
 
     async def aclose(self) -> None:
         await self.http.aclose()
@@ -101,7 +97,11 @@ class ComfyClient:
     async def submit_prompt(self, prompt: dict, prompt_id: str) -> dict:
         resp = await self.http.post(
             "/api/prompt",
-            json={"prompt": prompt, "client_id": CLIENT_ID, "prompt_id": prompt_id},
+            json={
+                "prompt": prompt,
+                "client_id": self.client_id,
+                "prompt_id": prompt_id,
+            },
         )
         if resp.status_code == 400:
             raise ComfyError(resp.json())
@@ -182,42 +182,22 @@ class ComfyClient:
         if kind in _TEXT_TYPES:
             await on_event(kind, msg.get("data") or {})
 
-    def silent_seconds(self) -> float:
-        """How long ago the last frame arrived on the event stream."""
-        return time.monotonic() - self._last_frame
-
-    async def kick(self) -> None:
-        """Drop the event stream so listen() rebuilds it, without the disconnected event.
-
-        ComfyUI keys its sockets by clientId, and the late cleanup of a dead predecessor
-        connection with the same clientId can evict the live socket from that map. The TCP
-        connection stays healthy, so only reconnecting re-registers the clientId.
-        """
-        socket = self._socket
-        if socket is None:
-            return
-        self._kicked = True
-        await socket.close()
-
     async def _run_connection(self, on_event) -> None:
-        async with websockets.connect(_ws_url(self.base_url), max_size=None) as socket:
-            self._socket = socket
-            self._last_frame = time.monotonic()
-            try:
-                await socket.send(
-                    json.dumps(
-                        {
-                            "type": "feature_flags",
-                            "data": {"supports_preview_metadata": True},
-                        }
-                    )
+        self.client_id = uuid.uuid4().hex
+        async with websockets.connect(
+            _ws_url(self.base_url, self.client_id), max_size=None
+        ) as socket:
+            await socket.send(
+                json.dumps(
+                    {
+                        "type": "feature_flags",
+                        "data": {"supports_preview_metadata": True},
+                    }
                 )
-                await on_event("connected", {})
-                async for raw in socket:
-                    self._last_frame = time.monotonic()
-                    await self._on_message(on_event, raw)
-            finally:
-                self._socket = None
+            )
+            await on_event("connected", {})
+            async for raw in socket:
+                await self._on_message(on_event, raw)
 
     async def listen(self, on_event) -> None:
         """Read while connected, back off and reconnect when dropped.
@@ -242,10 +222,6 @@ class ComfyClient:
                         error=repr(err),
                     )
                     logged = True
-            # A kick is a deliberate rebuild of a healthy-looking connection: announcing it as a
-            # disconnect would fail every job in flight for a link that is about to come back.
-            kicked, self._kicked = self._kicked, False
-            if not kicked:
-                await on_event("disconnected", {})
+            await on_event("disconnected", {})
             await asyncio.sleep(delay)
             delay = min(delay * 2, RETRY_CAP)
