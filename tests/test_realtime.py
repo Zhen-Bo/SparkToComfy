@@ -90,8 +90,10 @@ class RecordingConn:
         return self.received
 
 
-async def fake_comfy(port):
+async def fake_comfy(port, on_connect=None):
     async def handler(conn):
+        if on_connect is not None:
+            on_connect()
         async for _ in conn:
             pass
 
@@ -99,9 +101,9 @@ async def fake_comfy(port):
 
 
 @asynccontextmanager
-async def comfy_link(rt):
+async def comfy_link(rt, on_connect=None):
     """Run an in-process fake ComfyUI WebSocket server, point the runtime at it and listen."""
-    server = await fake_comfy(0)
+    server = await fake_comfy(0, on_connect)
     port = server.sockets[0].getsockname()[1]
     stub = comfy_client.ComfyClient(f"http://127.0.0.1:{port}")
     original, rt.ctx.comfy = rt.ctx.comfy, stub
@@ -343,6 +345,41 @@ async def test_reconnect_brings_comfy_back_online(rt):
     async with comfy_link(rt):
         await conn.wait_for(1, what="online messages")
     assert conn.received == [{"type": "system", "comfyOnline": True}], conn.received
+
+
+async def test_silent_stream_while_running_reconnects_without_offline(
+    rt, example_values
+):
+    """A stream that stays silent while a job runs means ComfyUI evicted our clientId socket.
+
+    The reconcile pass must rebuild the connection so the clientId is registered again, and the
+    rebuild must not take the offline path: the job stays in flight and no client hears offline.
+    """
+    conn = RecordingConn()
+    pid = "deaf-" + uuid.uuid4().hex
+    connected = asyncio.Event()
+    async with watching(rt, "deaf-watch") as watcher:
+        async with comfy_link(rt, on_connect=connected.set):
+            await watcher.wait_for(1, what="online broadcasts")
+            rt.hub.add_connection(OFF_SESSION, conn)
+            assert rt.registry.reserve_ip(OFF_IP, pid) is None
+            job = make_job(pid, OFF_SESSION, OFF_IP, example_values)
+            job.status = "running"
+            rt.registry.add_job(job)
+            queue = {"queue_running": [[0, pid]], "queue_pending": []}
+            with mock.patch.object(
+                rt.comfy, "get_queue", mock.AsyncMock(return_value=queue)
+            ):
+                connected.clear()
+                rt.comfy._last_frame -= comfy_client.DEAF_SECONDS + 1
+                await rt.events.refresh_positions()
+                await asyncio.wait_for(connected.wait(), timeout=10)
+            assert rt.queue.online, "a kick must never look like going offline"
+            assert rt.registry.get(pid) is not None, "the job must stay in flight"
+            assert conn.received == [], conn.received
+        assert watcher.received == [{"type": "system", "comfyOnline": True}], (
+            watcher.received
+        )
 
 
 class Terminal(NamedTuple):
