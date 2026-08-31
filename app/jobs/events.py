@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from app.comfy.client import collect_images
+from app.comfy.client import DEAF_SECONDS, collect_images
 from app.images.urls import image_urls
 from app.jobs.config import RECONCILE
 from app.jobs.context import JobContext
@@ -114,6 +114,7 @@ class JobEvents:
         present = await self.queue.observe()
         if present is None:
             return
+        await self._kick_if_deaf()
         now = time.monotonic()
         for job in self.ctx.registry.all_jobs():
             if job.prompt_id in present:
@@ -130,6 +131,22 @@ class JobEvents:
             if now - job.missing_since < RECONCILE.interval_seconds:
                 continue
             await self._retire(job)
+
+    async def _kick_if_deaf(self) -> None:
+        """A running job streams progress and previews; a stream with nothing to say is presumed
+        evicted from ComfyUI's clientId socket map (its TCP link stays healthy, so only silence
+        shows it). Reconnecting re-registers the clientId and the previews of the running job
+        resume; a false alarm during a long silent node costs one cheap reconnect.
+        """
+        if self.ctx.comfy.silent_seconds() < DEAF_SECONDS:
+            return
+        if not any(job.status == "running" for job in self.ctx.registry.all_jobs()):
+            return
+        logger.warning(
+            "ComfyUI stream silent while a job runs, reconnecting",
+            silent_seconds=round(self.ctx.comfy.silent_seconds(), 1),
+        )
+        await self.ctx.comfy.kick()
 
     async def _retire(self, job: Job) -> None:
         """A job ComfyUI has not listed for a whole reconcile interval and never reported on.
