@@ -1,6 +1,6 @@
 [project]
 name = "comfypanel-backend"
-version = "0.2.0"
+version = "0.3.0"
 description = "Relay backend between the web frontend and a ComfyUI instance"
 license = "MIT"
 license-files = ["LICENSE"]
