@@ -3,7 +3,6 @@ export default {
   app: {
     titleStudio: 'SparkToComfy — ComfyUI Studio',
     titlePlayground: 'Components Overview — SparkToComfy Playground',
-    minwNote: 'This interface needs a wider window (≥ 960px recommended) — the layout stays fixed and the center preview may be squeezed',
   },
   common: {
     value: 'Value',
@@ -56,7 +55,11 @@ export default {
     cancelQueue: 'Leave queue',
     cancelGeneration: 'Cancel',
     busy: 'Generating…',
-    tooNarrow: 'Window too narrow', // the stage is too small to show a result; see app.minwNote
+  },
+  // Mobile bottom parameter sheet (MobileSheet): accessible names for the grabber button
+  sheet: {
+    expand: 'Expand the parameter panel',
+    collapse: 'Collapse the parameter panel',
   },
   queue: {
     ahead: '{n} tasks ahead',
@@ -124,6 +127,7 @@ export default {
     remove: 'Remove {name}',
     strength: '{name} strength',
     cover: '{name} cover',
+    copiedName: 'Name copied ─ {name}',
     picker: {
       title: 'Pick LoRAs',
       max: 'Up to {max}',
@@ -157,20 +161,11 @@ export default {
     prevTitle: 'Previous (←)',
     nextTitle: 'Next (→)',
     imgAlt: 'History image {n}: {width} × {height}',
-    hintWheel: 'Wheel ─ Zoom',
+    hintZoom: 'Wheel ─ Zoom',
+    hintPinch: 'Pinch ─ Zoom',
     hintCopy: 'CTRL+C ─ Copy',
-    params: 'Image parameters',
-    collapsePanel: 'Collapse parameters panel',
-    expandPanel: 'Expand parameters panel',
     close: 'Close (ESC)',
     backfill: 'Restore all parameters',
-    size: 'Size',
-    steps: 'Steps',
-    positive: 'Positive prompt ─ {text}',
-    quality: 'Quality prompt ─ {text}',
-    sampler: 'Sampler',
-    model: 'Model',
-    negative: 'Negative prompt ─ {text}',
   },
   notify: {
     generateFailed: 'Generation failed ─ {reason}',

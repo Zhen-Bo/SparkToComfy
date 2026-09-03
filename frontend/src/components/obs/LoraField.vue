@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { LORA_MAX, catalog, controls } from '@/stores/catalog'
 import { loraCoverUrl } from '@/api/comfy'
 import { cn } from '@/lib/utils'
+import { notify, notifyError } from '@/stores/notify'
 import LoraPickerDialog from '@/components/obs/LoraPickerDialog.vue'
 import Slider from '@/components/ui/Slider.vue'
 import { PhImage, PhX } from '@phosphor-icons/vue'
@@ -42,15 +43,24 @@ const failed = ref(new Set()) // file names whose cover 404s; the backend always
 const SHOW_DELAY = 500
 let showTimer = 0
 
-function placePreview(e, file) {
+function placePreview(e, file, forTouch = false) {
   const d = coverDims.value[file] ?? { w: PREVIEW_MAX_W, h: PREVIEW_MAX_H }
-  let left = e.clientX + CURSOR_GAP
-  if (left + d.w + PAD + 8 > window.innerWidth) left = e.clientX - d.w - PAD - CURSOR_GAP
   const h = d.h + PAD
-  const top = Math.min(Math.max(e.clientY - h / 2, 8), window.innerHeight - h - 8)
+  let left
+  if (forTouch) {
+    // the finger would cover its own preview, so touch floats it centred above, not beside
+    left = Math.min(Math.max(e.clientX - (d.w + PAD) / 2, 8), window.innerWidth - d.w - PAD - 8)
+  } else {
+    left = e.clientX + CURSOR_GAP
+    if (left + d.w + PAD + 8 > window.innerWidth) left = e.clientX - d.w - PAD - CURSOR_GAP
+  }
+  const top = forTouch
+    ? Math.min(Math.max(e.clientY - h - FINGER_GAP, 8), window.innerHeight - h - 8)
+    : Math.min(Math.max(e.clientY - h / 2, 8), window.innerHeight - h - 8)
   preview.value = { file, left: Math.round(left), top: Math.round(top), w: d.w, h: d.h }
 }
 function showPreview(e, lora) {
+  if (fromTouch()) return
   lastMove = { clientX: e.clientX, clientY: e.clientY }
   clearTimeout(showTimer)
   showTimer = setTimeout(() => {
@@ -63,6 +73,7 @@ function showPreview(e, lora) {
 let moveRAF = 0
 let lastMove = null
 function movePreview(e) {
+  if (fromTouch()) return
   lastMove = { clientX: e.clientX, clientY: e.clientY }
   if (!preview.value) return
   if (moveRAF) return
@@ -74,27 +85,117 @@ function movePreview(e) {
 function hidePreview() {
   if (showTimer) clearTimeout(showTimer)
   showTimer = 0
+  if (pressTimer) clearTimeout(pressTimer)
+  pressTimer = 0
+  previewTouch = false
+  pressFrom = null
   if (moveRAF) cancelAnimationFrame(moveRAF)
   moveRAF = 0
   lastMove = null
   preview.value = null
 }
+
+/* Long-press on the row: on the name it copies the name, anywhere else the cover floats above the finger.
+   The row opts out of scrolling and the callout (see .lora-row), or the browser takes the gesture over halfway. */
+const FINGER_GAP = 24 // the overlay floats this far above the finger, or the finger would cover it
+let pressTimer = 0
+let previewTouch = false
+let pressFrom = null // { x, y, rect, file } of the hold start
+let lastTouchAt = 0
+// phones replay a touch as mouse events; the recency check keeps the hover path from double-firing
+const fromTouch = () => Date.now() - lastTouchAt < 800
+
+function onRowPointerDown(e, lora) {
+  if (e.pointerType !== 'touch' || e.target.closest('button')) return
+  lastTouchAt = Date.now()
+  e.currentTarget.setPointerCapture(e.pointerId)
+  pressFrom = { x: e.clientX, y: e.clientY, rect: e.currentTarget.getBoundingClientRect(), file: lora.file, onName: !!e.target.closest('.lora-name') }
+  lastMove = { clientX: e.clientX, clientY: e.clientY }
+  clearTimeout(pressTimer)
+  pressTimer = setTimeout(() => {
+    pressTimer = 0
+    if (pressFrom.onName) return copyName(pressFrom.file)
+    previewTouch = true
+    placePreview(lastMove, pressFrom.file, true)
+  }, SHOW_DELAY)
+}
+
+async function copyName(file) {
+  const name = labelOf(file)
+  try {
+    await navigator.clipboard.writeText(name)
+    notify(t('lora.copiedName', { name }))
+  } catch (err) {
+    console.error('[lora] failed to copy the name', err)
+    notifyError(t('notify.copyDenied'))
+  }
+}
+
+function updatePendingPress(e) {
+  if (!pressTimer) return false
+  if (Math.hypot(e.clientX - pressFrom.x, e.clientY - pressFrom.y) <= 12) return true
+  clearTimeout(pressTimer)
+  pressTimer = 0
+  return true
+}
+
+const canMoveTouchPreview = () => previewTouch && !moveRAF
+const hasTouchPreviewPosition = () => previewTouch && pressFrom && lastMove
+const isInsidePressRow = ({ clientX, clientY }, rect) =>
+  clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+
+function moveTouchPreview() {
+  moveRAF = 0
+  if (!hasTouchPreviewPosition()) return
+  if (isInsidePressRow(lastMove, pressFrom.rect)) placePreview(lastMove, pressFrom.file, true)
+  else preview.value = null
+}
+
+function onRowPointerMove(e) {
+  if (e.pointerType !== 'touch' || !pressFrom) return
+  lastTouchAt = Date.now()
+  lastMove = { clientX: e.clientX, clientY: e.clientY }
+  // wandering before the hold finishes cancels the long-press
+  if (updatePendingPress(e)) return
+  if (!canMoveTouchPreview()) return
+  moveRAF = requestAnimationFrame(moveTouchPreview)
+}
+
+function onRowPointerEnd(e) {
+  if (e.pointerType !== 'touch') return
+  clearTimeout(pressTimer)
+  pressTimer = 0
+  pressFrom = null
+  if (previewTouch) {
+    previewTouch = false
+    preview.value = null
+  }
+}
 function onCoverError(file) {
   failed.value = new Set(failed.value).add(file)
 }
+
+function fittedCoverSize(nw, nh) {
+  const ratio = nw / nh
+  let w = PREVIEW_MAX_W
+  let h = w / ratio
+  if (h <= PREVIEW_MAX_H) return { w: Math.round(w), h: Math.round(h) }
+  h = PREVIEW_MAX_H
+  w = h * ratio
+  return { w: Math.round(w), h: Math.round(h) }
+}
+
+function repositionLoadedPreview(file) {
+  if (preview.value?.file !== file || !lastMove) return
+  placePreview(lastMove, file, previewTouch)
+}
+
 /** Once the cover loads, measure its real ratio so the overlay hugs the image shape with no margins, and reposition once at the final size. */
 function onCoverLoad(e, file) {
   const { naturalWidth: nw, naturalHeight: nh } = e.target
   if (!nw || !nh) return
-  const r = nw / nh
-  let w = PREVIEW_MAX_W
-  let h = w / r
-  if (h > PREVIEW_MAX_H) {
-    h = PREVIEW_MAX_H
-    w = h * r
-  }
-  coverDims.value = { ...coverDims.value, [file]: { w: Math.round(w), h: Math.round(h) } }
-  if (preview.value?.file === file && lastMove) placePreview(lastMove, file)
+  coverDims.value = { ...coverDims.value, [file]: fittedCoverSize(nw, nh) }
+  repositionLoadedPreview(file)
 }
 /* Being full does not use the native disabled attribute.
    When confirming the fifth LoRA closes the dialog, radix returns focus to this button, and native disabled would drop that focus onto body, the same evaporation problem as GenerateButton. aria-disabled plus this early return is enough. */
@@ -126,12 +227,17 @@ onBeforeUnmount(hidePreview) // same reason when switching tabs tears the compon
              The row is items-center, so the text shares a centre line with the 24px button.
              The hover preview is bound to this row only, so moving down to the slider does not trigger it and adjusting strength is never covered by the overlay. -->
         <div
-          class="-mx-3 -mt-2.5 flex items-center justify-between gap-3 px-3 pt-2.5"
+          class="lora-row -mx-3 -mt-2.5 flex select-none items-center justify-between gap-3 px-3 pt-2.5"
           @mouseenter="showPreview($event, lora)"
           @mousemove="movePreview"
           @mouseleave="hidePreview"
+          @pointerdown="onRowPointerDown($event, lora)"
+          @pointermove="onRowPointerMove"
+          @pointerup="onRowPointerEnd"
+          @pointercancel="onRowPointerEnd"
+          @contextmenu.prevent
         >
-          <span class="min-w-0 flex-1 truncate text-[12.5px] font-semibold" translate="no">{{ labelOf(lora.file) }}</span>
+          <span class="lora-name min-w-0 flex-1 truncate text-[12.5px] font-semibold" translate="no">{{ labelOf(lora.file) }}</span>
           <span class="shrink-0 font-mono text-[13px] font-semibold text-amber-bright tabular-nums" translate="no">{{ lora.strength.toFixed(2) }}</span>
           <button
             type="button"
@@ -200,3 +306,11 @@ onBeforeUnmount(hidePreview) // same reason when switching tabs tears the compon
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+/* The row doubles as the long-press surface for the cover preview, so it cannot also start a scroll or a text selection. */
+.lora-row {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+</style>

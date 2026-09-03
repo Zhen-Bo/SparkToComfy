@@ -8,6 +8,9 @@ import { PhX } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
 
+// MobileStudioView passes compact for the phone stage
+const props = defineProps({ compact: { type: Boolean, default: false } })
+
 const stars = ref('')
 
 const stage = ref(null)
@@ -118,7 +121,7 @@ watch(
     <div class="pointer-events-none absolute inset-0" style="background: radial-gradient(1000px 640px at 50% 42%, hsl(var(--glow) / .06) 0%, transparent 70%)" />
 
     <!-- Stage: the preview fills the space between the left and right columns -->
-    <div ref="stage" class="relative z-10 flex min-h-0 w-full flex-1 items-center justify-center p-8">
+    <div ref="stage" class="relative z-10 flex min-h-0 w-full flex-1 items-center justify-center" :class="props.compact ? 'p-4' : 'p-8'">
     <!-- Viewfinder; the size animation is attached only on a size change, see animateShape -->
     <div
       class="obs-corners relative"

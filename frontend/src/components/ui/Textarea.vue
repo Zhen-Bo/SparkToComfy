@@ -8,11 +8,9 @@ const props = defineProps({
   // Prompts are mostly tags, where the red squiggles are only noise.
   // A field holding real sentences turns this on at the call site.
   spellcheck: { type: Boolean, default: false },
-  /* Take the leftover height of the scroll area.
-     Only one field per scroll area may turn this on, or two of them would fight over it and oscillate.
-     It exists to remove the roughly 100px empty band above the generate row: better to give those lines to the field that needs them than to leave an empty plate.
-     It cannot chase itself, because slack is measured after this field's own height is zeroed, so the leftover it sees excludes it (see fit). */
-  fill: { type: Boolean, default: false },
+  /* A share of the scroll area's leftover height: 0 keeps the rows height, 1 takes it all.
+     Shares that sum to 1 divide the leftover exactly, because each field measures it after zeroing its own height (see fit), so the value cannot oscillate. */
+  fill: { type: Number, default: 0 },
 })
 const emit = defineEmits(['update:modelValue'])
 // The root is a wrapper, because <textarea> takes no pseudo-elements and the fade must be a real div.
@@ -41,6 +39,14 @@ let floor = 0 // height implied by rows, measured once
 // box-sizing is border-box but scrollHeight excludes the border; without these 2px it is always slightly short
 let borders = 0
 
+function measureSlack(port) {
+  if (props.fill <= 0 || !port) return 0
+  const last = port.lastElementChild
+  if (!last) return 0
+  const padB = parseFloat(getComputedStyle(port).paddingBottom) || 0
+  return Math.max(0, port.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - padB) * props.fill
+}
+
 const fit = () => {
   const t = el.value
   if (!t) return
@@ -56,14 +62,7 @@ const fit = () => {
   /* Measured after zeroing, so the leftover excludes this field and slack is a stable value that cannot oscillate through fit, grow, fit again.
      scrollHeight will not do: with content shorter than the container it equals clientHeight and never shows the leftover.
      So it measures the scroll area bottom minus the last section bottom, less the scroll area's own bottom padding, which is layout rather than empty space. */
-  let slack = 0
-  if (props.fill && port) {
-    const last = port.lastElementChild
-    if (last) {
-      const padB = parseFloat(getComputedStyle(port).paddingBottom) || 0
-      slack = Math.max(0, port.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - padB)
-    }
-  }
+  const slack = measureSlack(port)
   /* slack is the entire height available to this field once zeroed, not an extra increment: adding it to floor would count this field twice.
      With fill it raises both the floor, so an empty field still fills, and the ceiling, so long content can reach at least that far. */
   const lo = Math.max(floor, slack)

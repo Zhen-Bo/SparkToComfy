@@ -5,6 +5,7 @@
  * Opening or switching images fits the image (scale = minScale), the ceiling is 400% and the zoom factor is never displayed.
  * Zoom steps geometrically, x1.12 and /1.12, and the wheel anchors on the cursor, the way browsers and Figma do it.
  * The viewing margin is 16px on all four sides, because the dock floats and takes no layout space.
+ * Below 960px the side margins tighten to 8px and the stage reserves the top chrome and the bottom thumbnail panel.
  * Panning stops where the image edge meets the stage edge, so the image is always on screen and can never be lost.
 */
 
@@ -14,6 +15,9 @@ export const MAX_SCALE = 4
 export const ZOOM_FACTOR = 1.12 // geometric steps, so every notch feels the same, the standard for image viewers
 export const PAN_STEP = 40 // pan step in px for Shift plus an arrow key
 const EDGE = 16 // minimum distance between the image frame and each window edge
+const NARROW = 960 // below this the layout is the phone one (MobileStudioView takes over at the same line)
+const NARROW_TOP = 68 // the 44px top buttons plus their gap to the image
+const NARROW_BOTTOM = 145 // the phone bottom panel: 128px thumbnail strip + 16px padding + 1px border (see HistoryViewer.vue)
 
 export function useZoomPan(dims) {
   const scale = ref(1)
@@ -29,8 +33,12 @@ export function useZoomPan(dims) {
 
   const isLandscape = computed(() => dims.value.width > dims.value.height)
 
-  const stageW = computed(() => winW.value - EDGE * 2)
-  const stageH = computed(() => winH.value - EDGE * 2)
+  const narrow = computed(() => winW.value < NARROW)
+  const insets = computed(() => narrow.value ? { top: NARROW_TOP, bottom: NARROW_BOTTOM } : { top: EDGE, bottom: EDGE })
+
+  const stageW = computed(() => winW.value - (narrow.value ? 8 : EDGE) * 2)
+  const stageH = computed(() => winH.value - insets.value.top - insets.value.bottom)
+  const centerY = computed(() => (winH.value + insets.value.top - insets.value.bottom) / 2)
 
   /** The long side wins: landscape images lock width, portrait and square lock height. */
   const frame = computed(() => {
@@ -74,7 +82,7 @@ export function useZoomPan(dims) {
     if (next === old) return
     if (vx != null && next > 1) {
       const cx = winW.value / 2
-      const cy = winH.value / 2
+      const cy = centerY.value
       const k = next / old
       ox.value = Math.round(ox.value * k + (vx - cx) * (1 - k))
       oy.value = Math.round(oy.value * k + (vy - cy) * (1 - k))
@@ -84,8 +92,6 @@ export function useZoomPan(dims) {
   }
 
   function onWheel(e) {
-    // The wheel zooms anywhere, with no dead zone, except inside the parameter panel where it belongs to that panel's own scrolling.
-    if (e.target.closest('.viewer-params')) return
     e.preventDefault()
     zoom(e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR, e.clientX, e.clientY)
   }
@@ -143,7 +149,7 @@ export function useZoomPan(dims) {
     const cx = (a.x + b.x) / 2
     const cy = (a.y + b.y) / 2
     const scx = winW.value / 2
-    const scy = winH.value / 2
+    const scy = centerY.value
     ox.value = pinchFrom.ox * k + (pinchFrom.cx - scx) * (1 - k) + (cx - pinchFrom.cx)
     oy.value = pinchFrom.oy * k + (pinchFrom.cy - scy) * (1 - k) + (cy - pinchFrom.cy)
     scale.value = next
@@ -182,7 +188,7 @@ export function useZoomPan(dims) {
 
   return {
     scale, dragging, pinching, gesturing,
-    frameStyle, transform,
+    frameStyle, transform, insets,
     fitToStage, zoom, panBy, onWheel, onPointerDown, onPointerMove, onPointerUp,
   }
 }

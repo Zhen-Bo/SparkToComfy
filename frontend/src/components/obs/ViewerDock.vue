@@ -41,7 +41,7 @@ function focusOut(e) {
 <template>
   <div
     ref="el"
-    class="dock absolute inset-x-0 bottom-0 z-20 flex h-[88px] items-end justify-center"
+    class="dock absolute inset-x-0 bottom-0 z-20 flex h-[88px] items-end justify-center max-[959px]:hidden"
     :data-up="up"
     @mouseenter="enter"
     @mouseleave="leave"
@@ -88,7 +88,7 @@ function focusOut(e) {
 @media (any-pointer: coarse) {
   .dock-inner,
   .dock[data-up="true"] .dock-inner { transform: translateY(-16px); }
-  /* A finger needs the full target even though the mark stays the same size. */
-  .dock-btn { height: 44px; width: 44px; }
+  /* The swipe replaces the carets on touch, so only the counter stays */
+  .dock-btn { display: none; }
 }
 </style>
