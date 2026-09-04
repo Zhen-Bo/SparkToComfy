@@ -3,7 +3,7 @@
  * The LoRA picker, shared by the workspace and /playground.
  * Opening snapshots the current selection into a scratch list; only confirm writes it back to the store.
 */
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { LORA_MAX, catalog, controls } from '@/stores/catalog'
 import { loraCoverUrl } from '@/api/comfy'
@@ -21,9 +21,14 @@ const emit = defineEmits(['update:open'])
 const ctl = computed(() => controls.value.lora)
 const options = computed(() => ctl.value?.options ?? {})
 const files = computed(() => Object.keys(options.value))
-/* A fixed four-column 960px grid leaves roughly 230px of dead space when fewer LoRAs exist, which reads as a missing card.
-   Both the column count and the dialog width follow the real number. */
-const cols = computed(() => Math.min(4, Math.max(1, files.value.length)))
+/* Columns and width follow the real count, or a fixed 960px grid reads as a missing card;
+   under 600px four columns would shrink the covers to thumbnails, so two. */
+const NARROW = matchMedia('(max-width: 599px)')
+const narrow = ref(NARROW.matches)
+const onNarrow = (e) => { narrow.value = e.matches }
+onMounted(() => NARROW.addEventListener('change', onNarrow))
+onUnmounted(() => NARROW.removeEventListener('change', onNarrow))
+const cols = computed(() => Math.min(narrow.value ? 2 : 4, Math.max(1, files.value.length)))
 const boxWidth = ['', 'max-w-[320px]', 'max-w-[560px]', 'max-w-[760px]', 'max-w-[960px]']
 
 const traySel = ref([]) // scratch selection while the dialog is open; file names, no duplicates

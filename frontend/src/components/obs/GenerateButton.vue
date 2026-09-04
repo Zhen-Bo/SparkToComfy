@@ -14,12 +14,15 @@
  * Demo mode, used by the /playground overview, only plays its own busy and recovery.
  * It starts no generation, writes no store and touches no other row, matching the pg-matrix rule that rows never drive each other.
 */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { connection } from '@/stores/connection'
 import { cancelRun, generate, run } from '@/stores/run'
 import { cn } from '@/lib/utils'
 import CancelRunDialog from '@/components/obs/CancelRunDialog.vue'
+
+// Two root nodes (button + dialog), so attrs cannot auto-inherit: the host's class goes on the button explicitly.
+defineOptions({ inheritAttrs: false })
 
 const { t } = useI18n()
 
@@ -34,21 +37,12 @@ function runDemo() {
   setTimeout(() => { demoBusy.value = false }, 2200)
 }
 
-/* The parameter column is a fixed 364px, so below 600px the stage is under 240px and a result has nowhere to appear.
-   app.minwNote advises 960px; this is the narrower point where the stage stops existing, so starting a job is withheld rather than advised against.
-   It blocks starting only. A job already running must stay cancellable at any width, or a narrow window would trap the user with a job they cannot stop. */
-const TOO_NARROW = matchMedia('(max-width: 599px)')
-const tooNarrow = ref(TOO_NARROW.matches)
-const onNarrow = (e) => { tooNarrow.value = e.matches }
-onMounted(() => TOO_NARROW.addEventListener('change', onNarrow))
-onBeforeUnmount(() => TOO_NARROW.removeEventListener('change', onNarrow))
-
+const LOCKED_PHASES = new Set(['cancelling', 'transfer'])
 const locked = computed(() =>
   props.demo
     ? demoBusy.value
     : !connection.wsOnline ||
-      (!run.busy && tooNarrow.value) ||
-      (run.busy && (run.promptId === null || run.phase === 'cancelling' || run.phase === 'transfer')),
+      (run.busy && (run.promptId === null || LOCKED_PHASES.has(run.phase))),
 )
 
 /** Phases where a press destroys something: the button is red and asks first. */
@@ -63,11 +57,12 @@ watch(() => [run.busy, run.phase], () => {
 
 /** Busy labels by phase. Any phase not listed is a running generation, which the press cancels. */
 const BUSY_LABEL = { cancelling: 'generate.cancelling', transfer: 'generate.transfer', queued: 'generate.cancelQueue' }
+const demoLabel = () => t(demoBusy.value ? 'generate.busy' : 'generate.start')
 
 const label = computed(() => {
-  if (props.demo) return t(demoBusy.value ? 'generate.busy' : 'generate.start')
+  if (props.demo) return demoLabel()
   if (!connection.wsOnline) return t('generate.connecting') // includes the first load: not connected until the first system arrives
-  if (!run.busy) return t(tooNarrow.value ? 'generate.tooNarrow' : 'generate.start')
+  if (!run.busy) return t('generate.start')
   if (run.promptId === null) return t('generate.preparing')
   return t(BUSY_LABEL[run.phase] ?? 'generate.cancelGeneration')
 })
@@ -95,6 +90,7 @@ function onConfirmCancel() {
       locked && 'cursor-not-allowed border-amber-dim text-amber',
       destructive && 'border-destructive text-destructive hover:bg-destructive/10 active:scale-[.98]',
       !locked && !destructive && 'border-amber text-amber hover:bg-amber/10 hover:text-amber-bright active:scale-[.98]',
+      $attrs.class,
     )"
     @click="onClick"
   >{{ label }}</button>

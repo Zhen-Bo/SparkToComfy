@@ -8,11 +8,9 @@ const props = defineProps({
   // Prompts are mostly tags, where the red squiggles are only noise.
   // A field holding real sentences turns this on at the call site.
   spellcheck: { type: Boolean, default: false },
-  /* Take the leftover height of the scroll area.
-     Only one field per scroll area may turn this on, or two of them would fight over it and oscillate.
-     It exists to remove the roughly 100px empty band above the generate row: better to give those lines to the field that needs them than to leave an empty plate.
-     It cannot chase itself, because slack is measured after this field's own height is zeroed, so the leftover it sees excludes it (see fit). */
-  fill: { type: Boolean, default: false },
+  /* A share of the scroll area's common free-height pool: 0 keeps the rows height, 1 takes it all.
+     Minimum rows and long content may make the fields taller than their shares. */
+  fill: { type: Number, default: 0 },
 })
 const emit = defineEmits(['update:modelValue'])
 // The root is a wrapper, because <textarea> takes no pseudo-elements and the fade must be a real div.
@@ -41,6 +39,23 @@ let floor = 0 // height implied by rows, measured once
 // box-sizing is border-box but scrollHeight excludes the border; without these 2px it is always slightly short
 let borders = 0
 
+function measureSlack(port) {
+  if (props.fill <= 0 || !port) return 0
+  const last = port.lastElementChild
+  if (!last) return 0
+  /* Every fill field must measure the same pool. Temporarily removing all of them
+     prevents their current heights and callback order from changing each other's shares. */
+  const peers = [...port.querySelectorAll('textarea[data-fill-share]')]
+  const peerHeights = peers.map((peer) => peer.style.height)
+  peers.forEach((peer) => { peer.style.height = '0px' })
+  const padB = parseFloat(getComputedStyle(port).paddingBottom) || 0
+  const pool = Math.max(0, port.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - padB)
+  peers.forEach((peer, i) => {
+    if (peer !== el.value) peer.style.height = peerHeights[i]
+  })
+  return pool * props.fill
+}
+
 const fit = () => {
   const t = el.value
   if (!t) return
@@ -53,18 +68,11 @@ const fit = () => {
   const port = t.closest('[data-fieldport]')
   const cap = port ? Math.min(CAP_PX, port.clientHeight * CAP_RATIO) : Infinity
   t.style.height = '0px'
-  /* Measured after zeroing, so the leftover excludes this field and slack is a stable value that cannot oscillate through fit, grow, fit again.
+  /* Measured after zeroing every fill field, so each one receives the same pool regardless of callback order.
      scrollHeight will not do: with content shorter than the container it equals clientHeight and never shows the leftover.
      So it measures the scroll area bottom minus the last section bottom, less the scroll area's own bottom padding, which is layout rather than empty space. */
-  let slack = 0
-  if (props.fill && port) {
-    const last = port.lastElementChild
-    if (last) {
-      const padB = parseFloat(getComputedStyle(port).paddingBottom) || 0
-      slack = Math.max(0, port.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - padB)
-    }
-  }
-  /* slack is the entire height available to this field once zeroed, not an extra increment: adding it to floor would count this field twice.
+  const slack = measureSlack(port)
+  /* slack is this field's share of the common pool, not an extra increment: adding it to floor would count this field twice.
      With fill it raises both the floor, so an empty field still fills, and the ceiling, so long content can reach at least that far. */
   const lo = Math.max(floor, slack)
   const hi = Math.max(cap, slack)
@@ -91,6 +99,7 @@ watch(() => props.modelValue, () => nextTick(fit))
     <textarea
       ref="el"
       v-bind="$attrs"
+      :data-fill-share="props.fill > 0 || undefined"
       :spellcheck="props.spellcheck"
       :class="cn(
         'block max-h-[60vh] w-full resize-none overflow-y-auto rounded-md border border-control obs-inset px-3 py-2 font-mono text-xs leading-relaxed text-foreground obs-tr placeholder:text-ink-faint focus-visible:border-amber disabled:cursor-not-allowed disabled:opacity-50',

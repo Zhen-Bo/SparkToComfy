@@ -3,7 +3,6 @@ export default {
   app: {
     titleStudio: 'SparkToComfy — ComfyUI Studio',
     titlePlayground: '组件总览 — SparkToComfy Playground',
-    minwNote: '此界面需较宽窗口，建议 ≥ 960px — 布局不调整，中央预览可能受挤压',
   },
   common: {
     value: '数值',
@@ -56,7 +55,11 @@ export default {
     cancelQueue: '取消排队',
     cancelGeneration: '取消生成',
     busy: '生成中…',
-    tooNarrow: '窗口太窄',
+  },
+  // 手机版底部参数抽屉（MobileSheet）：握把按钮的无障碍名称
+  sheet: {
+    expand: '展开参数面板',
+    collapse: '收起参数面板',
   },
   queue: {
     ahead: '前方还有 {n} 个任务',
@@ -124,6 +127,7 @@ export default {
     remove: '移除 {name}',
     strength: '{name} 强度',
     cover: '{name} 封面',
+    copiedName: '已复制名称 ─ {name}',
     picker: {
       title: 'LoRA 选择',
       max: '最多 {max} 个',
@@ -157,20 +161,11 @@ export default {
     prevTitle: '上一张（←）',
     nextTitle: '下一张（→）',
     imgAlt: '历史图 {n}：{width} × {height}',
-    hintWheel: '滚轮 ─ 缩放',
+    hintZoom: '滚轮 ─ 缩放',
+    hintPinch: '双指 ─ 缩放',
     hintCopy: 'CTRL+C ─ 复制',
-    params: '图片参数',
-    collapsePanel: '收合参数面板',
-    expandPanel: '展开参数面板',
     close: '关闭（ESC）',
     backfill: '回填全部参数',
-    size: '尺寸',
-    steps: '步数',
-    positive: '正面提示词 ─ {text}',
-    quality: '质量提示词 ─ {text}',
-    sampler: '采样器',
-    model: '模型',
-    negative: '负面提示词 ─ {text}',
   },
   notify: {
     generateFailed: '生成失败 ─ {reason}',

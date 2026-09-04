@@ -7,7 +7,6 @@ export default {
   app: {
     titleStudio: 'SparkToComfy — ComfyUI Studio',
     titlePlayground: '元件總覽 — SparkToComfy Playground',
-    minwNote: '此介面需較寬視窗，建議 ≥ 960px — 版面配置不調整，中央預覽可能受擠壓',
   },
   common: {
     value: '數值', // 裸控件的無障礙名稱預設（ui/Slider、obs/ParamSlider）
@@ -62,7 +61,11 @@ export default {
     cancelQueue: '取消排隊',
     cancelGeneration: '取消生成',
     busy: '生成中…',
-    tooNarrow: '視窗太窄', // 舞台已小到看不見成品，見 app.minwNote
+  },
+  // 手機版底部參數抽屜（MobileSheet）：握把按鈕的無障礙名稱
+  sheet: {
+    expand: '展開參數面板',
+    collapse: '收合參數面板',
   },
   queue: {
     ahead: '前方還有 {n} 個任務',
@@ -131,6 +134,7 @@ export default {
     remove: '移除 {name}',
     strength: '{name} 強度',
     cover: '{name} 封面',
+    copiedName: '已複製名稱 ─ {name}',
     picker: {
       title: 'LoRA 選擇',
       max: '最多 {max} 個',
@@ -164,20 +168,11 @@ export default {
     prevTitle: '上一張（←）',
     nextTitle: '下一張（→）',
     imgAlt: '歷史圖 {n}：{width} × {height}',
-    hintWheel: '滾輪 ─ 縮放',
+    hintZoom: '滾輪 ─ 縮放',
+    hintPinch: '雙指 ─ 縮放',
     hintCopy: 'CTRL+C ─ 複製',
-    params: '圖片參數',
-    collapsePanel: '收合參數面板',
-    expandPanel: '展開參數面板',
     close: '關閉（ESC）',
     backfill: '回填全部參數',
-    size: '尺寸',
-    steps: '步數',
-    positive: '正面提示詞 ─ {text}',
-    quality: '品質提示詞 ─ {text}',
-    sampler: '採樣器',
-    model: '模型',
-    negative: '負面提示詞 ─ {text}',
   },
   notify: {
     generateFailed: '生成失敗 ─ {reason}',

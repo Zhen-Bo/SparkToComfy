@@ -5,11 +5,11 @@
 
    Behaviour:
    - opening or switching fits the image (scale = minScale), the ceiling is 400% and the zoom factor is never displayed
-   - left and right always switch images; panning is a drag once zoomed in, or Shift plus an arrow key; there are solid edge buttons plus the bottom dock
+   - left and right always switch images; a horizontal touch swipe switches them too, and below 960px the solid edge buttons are gone
+   - panning is a drag once zoomed in, or Shift plus an arrow key; there are solid edge buttons plus the bottom dock
    - switching is a directional slide and cross-fade through a keyed remount inside a <Transition>, so the fit reset never runs through a transform transition and nothing jumps
-   - the key hints and the parameter panel share one 264px column at the top left: one surface, one width, one left edge, with the panel collapsed by default
-   - the column and the dock are translucent (.obs-ghost); restoring takes every parameter; a resize recomputes the floor */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+   - the key hints sit at the top left, the dock at the bottom: both are translucent (.obs-ghost); a resize recomputes the floor */
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useModalLayer } from '@/lib/useModalLayer'
 import { useCopyImage } from '@/lib/useCopyImage'
 import { PAN_STEP, ZOOM_FACTOR, useZoomPan } from '@/lib/useZoomPan'
@@ -17,9 +17,8 @@ import { useI18n } from 'vue-i18n'
 import { sizeOf } from '@/stores/catalog'
 import { restoreFromHistory, timeOf } from '@/stores/history'
 import { locked } from '@/stores/run'
-import { PhX, PhArrowSquareIn, PhCaretLeft, PhCaretRight, PhImageBroken } from '@phosphor-icons/vue'
+import { PhX, PhArrowSquareIn, PhCaretLeft, PhCaretRight, PhImageBroken, PhArrowsOutSimple } from '@phosphor-icons/vue'
 import ViewerDock from '@/components/obs/ViewerDock.vue'
-import ViewerParams from '@/components/obs/ViewerParams.vue'
 
 const { t } = useI18n()
 
@@ -30,7 +29,6 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const idx = ref(props.startIndex)
-const paramsOpen = ref(false)
 // swap direction: 1 is next, the old image leaving left; -1 is previous, the old image leaving right
 const slideDir = ref(1)
 const closeBtn = ref(null)
@@ -61,7 +59,7 @@ const src = computed(() => entry.value.images?.[0] ?? null)
 const showImage = computed(() => !!src.value && !failed.value)
 
 const {
-  scale, dragging, pinching, gesturing, frameStyle, transform,
+  scale, dragging, pinching, gesturing, frameStyle, transform, insets,
   fitToStage, zoom, panBy, onWheel, onPointerDown, onPointerMove, onPointerUp,
 } = useZoomPan(dims)
 
@@ -76,6 +74,57 @@ function go(d) {
   failed.value = false
   idx.value = (idx.value + d + props.entries.length) % props.entries.length
   fitToStage()
+}
+
+function goTo(i) {
+  if (i === idx.value) return
+  slideDir.value = i > idx.value ? 1 : -1
+  natural.value = null
+  failed.value = false
+  idx.value = i
+  fitToStage()
+}
+
+// scrollLeft, not scrollIntoView: that would scroll the page behind the overlay
+const stripEl = ref(null)
+watch(idx, () => {
+  const strip = stripEl.value
+  const cur = strip?.children[idx.value]
+  if (strip && cur) strip.scrollTo({ left: cur.offsetLeft - strip.clientWidth / 2 + cur.clientWidth / 2, behavior: 'smooth' })
+})
+
+const SWIPE_MIN = 64 // px; |dx| also has to beat |dy| by half again below, or the drag was diagonal
+let touchCount = 0
+let swipeFrom = null
+let swipedAt = 0
+const isHorizontalSwipe = (dx, dy) => Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) >= Math.abs(dy) * 1.5
+const swipeDirection = (dx) => (dx < 0 ? 1 : -1)
+
+function onStagePointerDown(e) {
+  if (e.pointerType !== 'touch') return
+  touchCount++
+  // one finger, still at the fit: a pinch or a pan is not a swipe
+  swipeFrom = touchCount === 1 && scale.value <= 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null
+}
+function onStagePointerUp(e) {
+  if (e.pointerType === 'touch') touchCount--
+  const from = swipeFrom
+  swipeFrom = null
+  if (!from || from.id !== e.pointerId) return
+  const dx = e.clientX - from.x
+  const dy = e.clientY - from.y
+  if (!isHorizontalSwipe(dx, dy)) return
+  swipedAt = Date.now()
+  go(swipeDirection(dx))
+}
+function onStagePointerCancel(e) {
+  if (e.pointerType === 'touch') touchCount--
+  swipeFrom = null
+}
+function onStageClick(e) {
+  if (e.pointerType === 'touch') return // a tap never closes
+  if (Date.now() - swipedAt < 350) return // the click trailing a swipe's pointerup
+  emit('close')
 }
 
 /** Focus loop: Tab stays inside the overlay, cycling between its first and last stop, a second guard beside inert.
@@ -160,22 +209,15 @@ function backfill() {
 
       <!-- Source order is reading order, so Tab follows the screen: the top-left column, the top-right actions,
            then the stage arrows, then the dock at the bottom. Stacking is set by z-index, not by this order. -->
-      <!-- Top left: one column at one width, holding the key hints and then the parameter panel, collapsed by default.
-           The hints carry only what the screen cannot show by itself: the wheel and the copy key. Switching, panning and closing each have their own visible cue.
-           max-height keeps the column one gap clear of the previous button: 50vh is the button's centre, less half its 44px height, less the 16px gap, less the 20px top margin. -->
-      <div
-        class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex w-[264px] flex-col border border-hairline"
-        style="max-height: calc(50vh - 58px)"
-      >
-        <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 border-b border-hairline px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
-          <span class="whitespace-nowrap">{{ t('viewer.hintWheel') }}</span>
-          <span class="whitespace-nowrap">{{ t('viewer.hintCopy') }}</span>
+      <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline">
+        <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
+          <span class="flex items-center gap-1 whitespace-nowrap"><PhArrowsOutSimple class="h-3.5 w-3.5" aria-hidden="true" /><span class="max-[959px]:hidden">{{ t('viewer.hintZoom') }}</span><span class="min-[960px]:hidden">{{ t('viewer.hintPinch') }}</span></span>
+          <span class="whitespace-nowrap max-[959px]:hidden">{{ t('viewer.hintCopy') }}</span>
         </div>
-
-        <ViewerParams v-model="paramsOpen" :params="p" :shown-dims="shownDims" />
       </div>
 
-      <div class="absolute right-5 top-5 z-20 flex flex-col gap-2.5">
+      <!-- On the phone the actions sit in one row: backfill left of close -->
+      <div class="absolute right-5 top-5 z-20 flex flex-col gap-2.5 max-[959px]:flex-row-reverse">
         <!-- Close is a leaving action, so hover only brightens it neutrally.
              Amber is reserved for the CTA, the active state and readouts -->
         <button
@@ -197,12 +239,14 @@ function backfill() {
         ><PhArrowSquareIn class="h-[18px] w-[18px]" aria-hidden="true" /></button>
       </div>
 
-      <!-- Stage: full bleed, with the margins on all four sides handled by the fit maths.
-           A click anywhere outside the image closes it -->
+      <!-- The padding mirrors the useZoomPan insets, so flex centring centres on the stage box, not the raw window -->
       <div
         class="absolute inset-0 flex items-center justify-center"
-        style="touch-action: none"
-        @click="emit('close')"
+        :style="{ touchAction: 'none', paddingTop: `${insets.top}px`, paddingBottom: `${insets.bottom}px` }"
+        @click="onStageClick"
+        @pointerdown="onStagePointerDown"
+        @pointerup="onStagePointerUp"
+        @pointercancel="onStagePointerCancel"
       >
         <!-- Swap transition: a keyed remount plus a directional slide and cross-fade.
              The new node mounts already fitted, so the fit reset never runs through a transform transition and nothing jumps -->
@@ -250,16 +294,37 @@ function backfill() {
           type="button"
           :title="t('viewer.prevTitle')"
           :aria-label="t('viewer.prev')"
-          class="obs-tr absolute left-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
+          class="stage-nav obs-tr absolute left-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
           @click.stop="go(-1)"
         ><PhCaretLeft class="h-[18px] w-[18px]" aria-hidden="true" /></button>
         <button
           type="button"
           :title="t('viewer.nextTitle')"
           :aria-label="t('viewer.next')"
-          class="obs-tr absolute right-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
+          class="stage-nav obs-tr absolute right-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
           @click.stop="go(1)"
         ><PhCaretRight class="h-[18px] w-[18px]" aria-hidden="true" /></button>
+      </div>
+
+      <!-- Phone thumbnail strip; the fit reserves its height: 128px thumbs + 16px padding + 1px border = 145px (NARROW_BOTTOM in useZoomPan.js) -->
+      <div class="obs-panel absolute inset-x-0 bottom-0 z-20 border-t border-hairline min-[960px]:hidden">
+        <div ref="stripEl" class="flex gap-2.5 overflow-x-auto p-2">
+          <button
+            v-for="(e, i) in entries"
+            :key="e.promptId"
+            type="button"
+            class="obs-tr obs-elevated relative h-32 w-32 flex-none cursor-pointer rounded-[3px] border p-[3px]"
+            :class="i === idx ? 'border-amber' : 'border-control hover:border-amber'"
+            :aria-label="t('history.viewAt', { n: i + 1, total: entries.length, time: timeOf(e.finishedAt) })"
+            :aria-current="i === idx || undefined"
+            @click="goTo(i)"
+          >
+            <div v-if="e.images?.[0]" class="relative h-full w-full overflow-hidden border border-hairline bg-plate-bg">
+              <img :src="e.images[0]" class="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-[16px] brightness-[.45] saturate-[.8]" alt="" aria-hidden="true" loading="lazy" decoding="async" />
+              <img :src="e.images[0]" class="relative h-full w-full object-contain" loading="lazy" decoding="async" alt="" />
+            </div>
+          </button>
+        </div>
       </div>
 
       <ViewerDock
@@ -303,6 +368,11 @@ function backfill() {
 .swap-prev-leave-to {
   opacity: 0;
   transform: translateX(28px);
+}
+
+/* On the phone layout the finger switches images directly, so the edge arrows only cover the image. */
+@media (max-width: 959px) {
+  .stage-nav { display: none; }
 }
 
 /* The overlay enters with opacity plus a .98 scale from the centre; the backdrop blur is constant and never transitions.
