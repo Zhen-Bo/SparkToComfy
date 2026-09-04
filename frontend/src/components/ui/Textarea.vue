@@ -8,8 +8,8 @@ const props = defineProps({
   // Prompts are mostly tags, where the red squiggles are only noise.
   // A field holding real sentences turns this on at the call site.
   spellcheck: { type: Boolean, default: false },
-  /* A share of the scroll area's leftover height: 0 keeps the rows height, 1 takes it all.
-     Shares that sum to 1 divide the leftover exactly, because each field measures it after zeroing its own height (see fit), so the value cannot oscillate. */
+  /* A share of the scroll area's common free-height pool: 0 keeps the rows height, 1 takes it all.
+     Minimum rows and long content may make the fields taller than their shares. */
   fill: { type: Number, default: 0 },
 })
 const emit = defineEmits(['update:modelValue'])
@@ -43,8 +43,17 @@ function measureSlack(port) {
   if (props.fill <= 0 || !port) return 0
   const last = port.lastElementChild
   if (!last) return 0
+  /* Every fill field must measure the same pool. Temporarily removing all of them
+     prevents their current heights and callback order from changing each other's shares. */
+  const peers = [...port.querySelectorAll('textarea[data-fill-share]')]
+  const peerHeights = peers.map((peer) => peer.style.height)
+  peers.forEach((peer) => { peer.style.height = '0px' })
   const padB = parseFloat(getComputedStyle(port).paddingBottom) || 0
-  return Math.max(0, port.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - padB) * props.fill
+  const pool = Math.max(0, port.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - padB)
+  peers.forEach((peer, i) => {
+    if (peer !== el.value) peer.style.height = peerHeights[i]
+  })
+  return pool * props.fill
 }
 
 const fit = () => {
@@ -59,11 +68,11 @@ const fit = () => {
   const port = t.closest('[data-fieldport]')
   const cap = port ? Math.min(CAP_PX, port.clientHeight * CAP_RATIO) : Infinity
   t.style.height = '0px'
-  /* Measured after zeroing, so the leftover excludes this field and slack is a stable value that cannot oscillate through fit, grow, fit again.
+  /* Measured after zeroing every fill field, so each one receives the same pool regardless of callback order.
      scrollHeight will not do: with content shorter than the container it equals clientHeight and never shows the leftover.
      So it measures the scroll area bottom minus the last section bottom, less the scroll area's own bottom padding, which is layout rather than empty space. */
   const slack = measureSlack(port)
-  /* slack is the entire height available to this field once zeroed, not an extra increment: adding it to floor would count this field twice.
+  /* slack is this field's share of the common pool, not an extra increment: adding it to floor would count this field twice.
      With fill it raises both the floor, so an empty field still fills, and the ceiling, so long content can reach at least that far. */
   const lo = Math.max(floor, slack)
   const hi = Math.max(cap, slack)
@@ -90,6 +99,7 @@ watch(() => props.modelValue, () => nextTick(fit))
     <textarea
       ref="el"
       v-bind="$attrs"
+      :data-fill-share="props.fill > 0 || undefined"
       :spellcheck="props.spellcheck"
       :class="cn(
         'block max-h-[60vh] w-full resize-none overflow-y-auto rounded-md border border-control obs-inset px-3 py-2 font-mono text-xs leading-relaxed text-foreground obs-tr placeholder:text-ink-faint focus-visible:border-amber disabled:cursor-not-allowed disabled:opacity-50',
