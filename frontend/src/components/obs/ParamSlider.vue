@@ -21,13 +21,11 @@ const inner = computed({
   set: (v) => emit('update:modelValue', v[0]),
 })
 
-/* Numeric entry: the readout is the input.
-   Blur or Enter commits and snaps to min, max and step. */
 const editing = ref(false)
 const draft = ref('')
 const inputEl = ref(null)
 
-/* Focus is set explicitly after mount and the text selected, rather than through the autofocus attribute: HTML processes autofocus once per document, so from the second click onward focus would land on <body> while the readout button is already replaced by the input, leaving the field stuck in edit mode and keyboard users lost. */
+// Focus after each input mount so repeated edits do not depend on native autofocus.
 function startEdit() {
   draft.value = props.modelValue.toFixed(props.decimals)
   editing.value = true
@@ -36,8 +34,7 @@ function startEdit() {
     inputEl.value?.select()
   })
 }
-/** Leave edit mode and return focus to the readout button.
- * A blur-driven exit does not grab focus, or clicking elsewhere would pull it back. */
+// A blur-driven exit must not pull focus back from the control the user just clicked.
 const readoutEl = ref(null)
 function leaveEdit(refocus) {
   editing.value = false
@@ -73,9 +70,7 @@ function onKey(e) {
         @blur="commit(false)"
         @keydown="onKey"
       />
-      <!-- The readout button and the input are the same size (h-8 by 52px), so entering edit mode neither pushes the slider nor jumps.
-           The border is not decoration: the readout is the editing surface, and a title attribute alone never reaches keyboard or touch users.
-           In this project the control border is the established signal for "this takes input", the same as on inputs and dropdown triggers. -->
+      <!-- Match the input dimensions to prevent a layout shift when editing starts. -->
       <button
         v-else
         ref="readoutEl"

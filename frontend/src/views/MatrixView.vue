@@ -1,10 +1,6 @@
 <script setup>
-/**
- * The component overview at /playground, laid out as a vertical ledger.
- * Every specimen mounts the real component from src/components, so changing any component's style or behaviour changes the workspace and this wall at once: one source.
- * Rows never drive each other.
- * The generate button only plays its own busy state through the demo prop, and the preview progress runs from an independent loop below without going through generate() or leaving a history card.
-*/
+/* Specimens use real components and share workspace parameters.
+   Generation is simulated: the button uses demo mode and the stage loop writes run state without submitting a job. */
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
@@ -26,17 +22,14 @@ import QueueSlots from '@/components/obs/QueueSlots.vue'
 import HistoryRail from '@/components/obs/HistoryRail.vue'
 import ThemeSwitcher from '@/components/obs/ThemeSwitcher.vue'
 
-/* The workspace is an app-style page that never scrolls, while this overview is a long page, so body scrolling is restored while it is mounted (see style.css). */
+// Enable document scrolling for this long page (see style.css).
 document.documentElement.dataset.route = 'playground'
 
-/* The preview loop demonstrates four phases: queue 07 down to 01, preparing for 1.4s, progress 0 to 100, an upscale sweep for 2.4s, then a hold and a restart.
-   It drives the real StagePlate by writing run.busy, phase, queueAhead and progress directly, without going through generate() and without leaving a history card.
-
-   It never starts while a real job is running: the demo would cover that job's screen, and the teardown reset to phase idle and busy false would show a running job as idle. driving records that this loop is the one that took the stage, so only it resets. */
+/* Only take over an idle stage. Track ownership so teardown cannot reset a real job. */
 let stageTimer = null
 let driving = false
 function stageLoop() {
-  if (run.busy && !driving) return // a real job is running, so the demo stands aside
+  if (run.busy && !driving) return
   driving = true
   let a = 7
   run.busy = true
@@ -76,7 +69,6 @@ function runUpPhase() {
   }, 2400)
 }
 
-/* The queue-slots specimen runs 07 down to 01 and then ready from local state, never the store, matching the display rule of the preview row. */
 const qsAhead = ref(7)
 const qsReady = ref(false)
 const qsEta = computed(() => {
@@ -102,7 +94,7 @@ onMounted(() => { stageLoop(); qsLoop() })
 onUnmounted(() => {
   delete document.documentElement.dataset.route
   for (const t of [stageTimer, qsTimer]) { clearInterval(t); clearTimeout(t) }
-  if (!driving) return // this loop did not take the stage, so leave it alone
+  if (!driving) return
   driving = false
   run.busy = false
   run.phase = 'idle'
@@ -110,7 +102,6 @@ onUnmounted(() => {
   run.progress = null
 })
 
-/* Demo state owned by the specimens themselves and kept out of the store: the bare slider, the tab demo and the picker open state. */
 const { t, tm, rt } = useI18n()
 const bareSlider = ref([40])
 const demoTab = ref('create')
@@ -124,8 +115,6 @@ const orientation = computed(() => {
   return width === height ? t('playground.square') : width > height ? t('playground.landscape') : t('playground.portrait')
 })
 
-/* The catalog: one row per file, with no extra rows for other uses of the same component.
-   Families are ordered ui/ first and obs/ second. name, meta and family are all i18n keys under playground.*; family doubles as the group key, so the order of the fam* keys is the family order. */
 const CATALOG = [
   { key: 'slider', tag: 'ui/Slider.vue', nameKey: 'playground.catalog.slider.name', family: 'famUi', metaKey: 'playground.catalog.slider.meta' },
   { key: 'textarea', tag: 'ui/Textarea.vue', nameKey: 'playground.catalog.textarea.name', family: 'famUi', metaKey: 'playground.catalog.textarea.meta' },
@@ -142,7 +131,6 @@ const CATALOG = [
   { key: 'history', tag: 'obs/HistoryRail.vue', nameKey: 'playground.catalog.history.name', family: 'famPreview', metaKey: 'playground.catalog.history.meta' },
 ]
 
-/* The interaction checklists live under playground.chk.*, as array messages: tm fetches them and rt renders each line into a string. */
 const chkOf = (key) => tm(`playground.chk.${key}`).map((line) => rt(line))
 
 const FAMS = [...new Set(CATALOG.map((c) => c.family))]
@@ -186,7 +174,6 @@ const FAMS = [...new Set(CATALOG.map((c) => c.family))]
               <Slider v-model="bareSlider" :aria-label="t('playground.sliderAria')" />
             </div>
 
-            <!-- ui/Textarea writes the store directly, so the workspace prompt stays in sync -->
             <div v-else-if="c.key === 'textarea'" class="band wide">
               <Textarea :model-value="catalog.params.positive ?? ''" @update:model-value="catalog.params.positive = $event" :rows="3" :aria-label="t('playground.positivePrompt')" translate="no" />
             </div>
@@ -222,7 +209,6 @@ const FAMS = [...new Set(CATALOG.map((c) => c.family))]
               <LoraField />
             </div>
 
-            <!-- obs/PanelTabs, with a matching tabpanel so the aria chain is complete -->
             <div v-else-if="c.key === 'tabs'" class="band" style="max-width: 340px">
               <PanelTabs v-model="demoTab" id-base="pg" />
               <div
@@ -233,18 +219,15 @@ const FAMS = [...new Set(CATALOG.map((c) => c.family))]
               >{{ t('playground.tabsNote', { tab: t(`tabs.${demoTab}`) }) }}</div>
             </div>
 
-            <!-- obs/QueueSlots, driven locally from queue to ready; the upscale sweep is in the four-phase preview demo -->
             <div v-else-if="c.key === 'qs'" class="band" style="max-width: 340px">
               <div class="qswrap"><QueueSlots :ahead="qsAhead" :ready="qsReady" :eta="qsEta" /></div>
             </div>
 
-            <!-- obs/GenerateButton in demo mode: it plays its own busy state only, starting no generation and touching no other row -->
             <div v-else-if="c.key === 'cta'" class="band">
               <GenerateButton demo />
               <div class="obs-hint">{{ t('playground.ctaNote') }}</div>
             </div>
 
-            <!-- obs/StagePlate in a fixed-height container, with the frame ratio following the size row -->
             <div v-else-if="c.key === 'stage'" class="band" style="max-width: 340px">
               <div class="stagewrap"><StagePlate /></div>
             </div>
@@ -262,7 +245,6 @@ const FAMS = [...new Set(CATALOG.map((c) => c.family))]
 </template>
 
 <style scoped>
-/* The ledger layout uses the same CSS variables as the rest of the app, so theme switching works here without anything extra */
 .pg { min-height: 100vh; }
 
 .hero { max-width: 1120px; margin: 0 auto; padding: 26px 28px 18px; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
@@ -286,7 +268,6 @@ const FAMS = [...new Set(CATALOG.map((c) => c.family))]
 .sec { margin-top: 30px; scroll-margin-top: 56px; }
 .seclabel { font-size: 14px; margin-bottom: 0; }
 
-/* Ledger row: a fixed information column on the left, a full-width interaction area right */
 .row { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 26px; padding: 18px 0 20px; border-bottom: 1px solid hsl(var(--hairline)); }
 .row:last-child { border-bottom: 0; }
 .ri { display: flex; flex-direction: column; gap: 5px; padding-top: 2px; }
@@ -302,11 +283,9 @@ const FAMS = [...new Set(CATALOG.map((c) => c.family))]
 .band.wide { max-width: 680px; }
 .sublabel { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; font-size: 12.5px; font-weight: 700; letter-spacing: .1em; color: hsl(var(--foreground)); }
 
-/* Picker trigger: the CTA shape in a quiet outline version */
 .ghostcta { width: 100%; padding: 11px 0; border: 1px solid hsl(var(--hairline)); border-radius: 6px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 12.5px; font-weight: 400; letter-spacing: .04em; cursor: pointer; }
 .ghostcta:hover { border-color: hsl(var(--edgeline)); color: hsl(var(--foreground)); }
 
-/* Preview and history specimens sit in fixed-height containers so each component adapts to the space available */
 .stagewrap { display: flex; height: 380px; border: 1px solid hsl(var(--hairline)); border-radius: 4px; overflow: hidden; }
 .stagewrap > * { flex: 1; min-width: 0; }
 .qswrap { display: flex; justify-content: center; padding: 30px 0; border: 1px solid hsl(var(--hairline)); border-radius: 4px; background: hsl(var(--plate-bg)); }

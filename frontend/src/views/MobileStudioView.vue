@@ -1,5 +1,4 @@
 <script setup>
-/** The phone layout; StudioView mounts it below 960px. */
 import { nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { connection } from '@/stores/connection'
@@ -37,7 +36,6 @@ function onStageTap(e) {
 
 <template>
   <div class="obs-grain flex h-dvh flex-col overflow-hidden">
-    <!-- chrome is plate; deep black is the preview area only -->
     <header class="obs-panel flex flex-none items-center justify-between gap-3 border-b border-hairline px-4 py-[21px]">
       <h1 class="font-disp text-[18px] tracking-[.12em]" translate="no"><span class="text-foreground">Spark</span><span class="text-amber-bright">To</span><span class="text-foreground">Comfy</span></h1>
       <p role="status">
@@ -74,7 +72,7 @@ function onStageTap(e) {
         <span class="font-mono text-[14px] font-semibold text-amber-bright tabular-nums" translate="no">{{ dimsKnown ? `${outputDims.width} × ${outputDims.height}` : '—' }}</span>
       </p>
       <div class="flex items-stretch gap-2.5">
-        <!-- Offline inert wraps only the main action: browsing past results does not need Comfy. min-h-12 keeps the row at the 48px touch target. -->
+        <!-- Keep history browsing available while Comfy is offline. -->
         <div class="min-h-12 flex-1" :inert="!connection.comfyOnline || null">
           <GenerateButton class="h-full w-full" />
         </div>

@@ -32,15 +32,10 @@ const { t } = useI18n()
       </p>
     </div>
 
-    <!-- Overlay scope.
-         The header and its badge stay reachable and unmasked; the offline overlay covers only this layer, the tab strip, the content and the generate row.
-         While the mask is up the three sibling layers are inert: the overlay itself stops the pointer and inert stops Tab and screen readers. -->
+    <!-- Keep the header outside the offline mask; covered controls also need inert to block keyboard access. -->
     <div class="relative flex min-h-0 flex-1 flex-col">
     <ParameterFields />
 
-    <!-- The generate row at the bottom: the real output size readout plus the main action, pinned rather than scrolled.
-         The readout includes the upscale factor (outputDims is the base times upscale) and tracks the factor slider live.
-         Orientation, square, portrait or landscape, is already shown by the shape of the stage viewfinder, so there is no badge for it -->
     <div class="border-t border-hairline px-5 pb-4 pt-3" :inert="!connection.comfyOnline || null">
       <div class="mb-2.5 flex items-baseline justify-between font-mono">
         <span class="text-[11px] tracking-[.1em] text-muted-foreground">{{ t('panel.outputSize') }}</span>
@@ -49,7 +44,6 @@ const { t } = useI18n()
       <GenerateButton />
     </div>
 
-    <!-- Offline overlay: it covers this layer whenever comfyOnline is false, whether the engine is down or the backend dropped, and disappears on recovery -->
     <OfflineOverlay />
     </div>
   </aside>
