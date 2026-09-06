@@ -1,8 +1,4 @@
-/**
- * 繁體中文（zh-TW）— 母本：現有 UI 中文原文直接收錄於此。
- * 與 zh-CN.js / en.js 的 key 結構必須完全一致（build 前有 key 對齊檢查）。
- * 插值一律 named（{name}）;含樣式讀數的句子用 <i18n-t> 具名 slot（queue.ahead、queue.eta、 history.clear.desc、viewer.counterDock）。
-*/
+/* 與 zh-CN.js / en.js 保持相同 key；插值使用 {name}，含樣式的讀數使用 i18n-t 具名 slot。 */
 export default {
   app: {
     titleStudio: 'SparkToComfy — ComfyUI Studio',
@@ -26,7 +22,7 @@ export default {
     done: '完成',
     countAtLimit: '字數已達上限 {max}，多出的內容不會被收下',
   },
-  // 參數控件名稱：key＝ R1 回傳的控件鍵（config/parameter/*.yaml 的控件名）,後端不送 label
+  // key 對應後端參數宣告的控件名；後端不提供控件 label。
   params: {
     model: '模型',
     quality: '品質提示詞',
@@ -40,7 +36,6 @@ export default {
     scheduler: '調度器',
     upscale: '放大倍率',
     lora: 'LoRA',
-    // 正面提示詞的 placeholder：這個欄位吃 tag 也吃自然語言，講清楚才不會看起來可有可無
     positiveHint: '描述你要的畫面 ─ 逗號分隔的 tag 或整句自然語言都可以',
   },
   theme: {
@@ -100,7 +95,6 @@ export default {
     retryAria: '用同一組參數重試上一次生成',
     dismiss: '關閉本次狀態',
   },
-  // 取消確認窗（CancelRunDialog）：語彙比照 history.clear，同樣是不可復原的破壞性動作
   cancelRun: {
     titleRunning: '取消目前的生成',
     titleQueued: '取消排隊',
@@ -200,7 +194,7 @@ export default {
     copyUnsupported: '複製失敗 ─ 瀏覽器不支援剪貼簿圖片',
     copyDenied: '複製失敗 ─ 剪貼簿寫入被拒絕',
   },
-  // 後端錯誤碼（原 stores/studio.js ERROR_TEXT）;查無碼時原樣顯示 code
+  // key 對應後端錯誤碼；未知碼由 stores/notify.js 原樣顯示。
   errors: {
     bad_request: '參數不合法',
     not_found: '找不到目標',

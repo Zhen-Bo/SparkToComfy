@@ -58,7 +58,7 @@ export async function generate() {
   if (run.busy) return
   run.busy = true
   run.phase = 'preparing'
-  run.promptId = null // the POST response supplies the identity; the receipt only repeats it
+  run.promptId = null
   run.progress = null
   run.previewFrame = null
   run.currentImage = null
@@ -68,7 +68,7 @@ export async function generate() {
   run.lastRun = { workflowId: catalog.workflowId, params: JSON.parse(JSON.stringify(catalog.params)) }
   try {
     const { promptId } = await submitGeneration({ workflowId: catalog.workflowId, params: catalog.params })
-    // The receipt may already have arrived over the socket; either source is fine, as long as this is still the same run.
+    // A socket receipt may arrive before the POST response; do not overwrite an assigned ID.
     if (run.busy && run.promptId === null) run.promptId = promptId
   } catch (err) {
     console.error('[generate] submit failed', err)
@@ -134,13 +134,8 @@ async function finish(images) {
   resetRun()
 }
 
-/**
- * A job whose outcome may have passed while the socket was dead.
- * The backend does not replay terminal messages, so its job record is the only way to tell.
- * Still in flight: the replay that follows system re-attaches it, nothing to do here.
- * Done or failed: finish it here exactly as the socket message would have.
- * No record: a cancelled job leaves none.
- */
+/* Recover terminal outcomes missed offline; live jobs reattach through the socket replay.
+   A missing server record is treated as cancellation. */
 export async function settleFromServer() {
   const promptId = run.promptId
   if (promptId === null) return // the POST has not answered yet; it brings the id

@@ -7,20 +7,15 @@ import { cn } from '@/lib/utils'
 import { PhArrowsLeftRight } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
-// Labels for the two resolution tiers.
 // The locale never changes at runtime, so reading them during setup is enough.
 const tiers = [t('ratio.standard'), t('ratio.highres')]
 
-// The submitted value has exactly three keys: preset, highres, landscape.
-// The backend looks the dimensions up; the frontend never sends them.
+// Submit preset selections; the backend resolves their dimensions.
 const presets = computed(() => controls.value.size?.presets ?? {})
 const keys = computed(() => Object.keys(presets.value))
 const size = computed(() => catalog.params.size ?? { preset: null, highres: false, landscape: false })
 
-/* Locked while generating.
-   inert plus pointer-events-none stops a real mouse and keyboard but not a programmatic click.
-   The contract in this project is that whatever is declared unavailable must really be a no-op (see the aria-disabled note in GenerateButton), so every entry that writes the store guards itself.
-   The flag itself is the shared locked from run.js. */
+// Guard programmatic actions as well as the inert UI while generating.
 const setPreset = (k) => { if (!locked.value) catalog.params.size.preset = k }
 const setTier = (hi) => { if (!locked.value) catalog.params.size.highres = hi }
 const toggleLandscape = () => { if (!locked.value) catalog.params.size.landscape = !catalog.params.size.landscape }
@@ -42,8 +37,7 @@ function shownRatio(label) {
   return b ? `${b}:${a}` : label
 }
 
-/** The corner marks are four fixed-shape paths, each a 3px stroke drawn from the origin and placed with a CSS transform.
-    A transform can be transitioned, so switching ratio or orientation slides them to the new position instead of jumping. */
+// Position fixed paths with transforms so corners can transition between ratio selections.
 function glyphCorners(p) {
   const { x, y, w, h } = glyphBox(p)
   return [
@@ -80,9 +74,7 @@ function onTierKey(e, i) {
 </script>
 
 <template>
-  <!-- The whole size area is locked while generating.
-       The viewfinder aspect ratio follows currentDims, so changing the size mid-run would force preview frames still arriving at the old ratio into the new frame and put black bars down the sides: the screen would be lying.
-       A change also cannot affect a job already submitted; it would only make the output-size readout disagree with the work in flight. inert rather than disabled, so focus does not evaporate onto body, the same as the offline overlay. -->
+  <!-- Lock dimensions so the frame and size readout stay consistent with the job in flight. -->
   <div :inert="run.busy || null" :class="run.busy && 'pointer-events-none opacity-50'">
     <div class="grid grid-cols-4 gap-[7px]" role="radiogroup" :aria-label="t('ratio.groupAria')">
       <button
@@ -102,7 +94,7 @@ function onTierKey(e, i) {
         @keydown="onRatioKey($event, i)"
       >
         <svg width="30" height="28" viewBox="0 0 30 28" aria-hidden="true">
-          <!-- The rect geometry is written as both attributes and style: a browser that supports CSS geometry properties gets the .glyph-anim transition, while an older one falls back to the attributes and updates instantly, with no animation but nothing broken. -->
+          <!-- Attributes provide a fallback when CSS geometry properties are unsupported. -->
           <rect
             class="glyph-anim"
             :x="glyphBox(presets[k]).x" :y="glyphBox(presets[k]).y" :width="glyphBox(presets[k]).w" :height="glyphBox(presets[k]).h"
@@ -162,9 +154,7 @@ function onTierKey(e, i) {
 </template>
 
 <style scoped>
-/* Turning the ratio box: the box geometry, through CSS geometry properties, and the corner offsets both use a 220ms fluid ease.
-   What changes is the state itself, one box deforming, not a decorative entry. obs-tr does not cover SVG geometry properties, so this uses a local class.
-   Reduced motion is handled by the global !important rule in style.css, which collapses it to nearly instant. */
+/* obs-tr does not include SVG geometry; reduced motion is handled globally. */
 .glyph-anim {
   transition:
     x 0.22s var(--ease-fluid),

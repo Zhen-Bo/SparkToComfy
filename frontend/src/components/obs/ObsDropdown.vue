@@ -3,12 +3,8 @@ import { nextTick, ref, useId, onMounted, onBeforeUnmount } from 'vue'
 import { cn } from '@/lib/utils'
 import { PhCaretDown, PhCheck } from '@phosphor-icons/vue'
 
-/**
- * Observatory-style dropdown.
- * items: [{ value, label, desc? }]
- * Accessibility follows the APG select-only combobox: the trigger is role="combobox" with aria-controls pointing at the listbox, focus stays on the trigger, arrow keys move the selection through aria-activedescendant, Enter and Space select, and ESC closes and returns focus to the trigger.
- * The role and aria-controls are not optional: aria-activedescendant only works on roles such as combobox, listbox and textbox, and on a plain button assistive technology ignores it, so the visual highlight moves while the screen reader stays silent.
-*/
+/* Focus stays on the trigger; combobox semantics and aria-controls let aria-activedescendant
+   announce the active option without moving DOM focus into the list. */
 const props = defineProps({
   items: { type: Array, required: true },
   modelValue: { type: [String, Number], default: null },
@@ -22,9 +18,7 @@ const root = ref(null)
 const menuEl = ref(null)
 const activeIdx = ref(-1)
 
-/* The menu is teleported to body and positioned fixed.
-   As an absolute child of the scroll box, a picker near the bottom of the panel had its menu clipped by overflow-y-auto: at 1280x720 the sampler lost 2 of 5 options and the scheduler 2 of 3, unreachable by mouse, though the keyboard was fine because of scrollIntoView.
-   It follows ThemeSwitcher: position on open, and recompute on resize and on scroll in the capture phase. */
+// Use viewport coordinates for the teleported menu to escape the panel's overflow clipping.
 const GAP = 4
 const EDGE = 8
 const menuStyle = ref({})
@@ -32,8 +26,7 @@ function place() {
   const r = root.value?.getBoundingClientRect()
   if (!r) return
   menuStyle.value = { left: `${r.left}px`, top: `${r.bottom + GAP}px`, width: `${r.width}px` }
-  // Flip above the trigger when there is no room below.
-  // The real height is only known after mount, so this runs then.
+  // Wait for the mounted menu's height before deciding whether to flip above the trigger.
   nextTick(() => {
     const m = menuEl.value?.getBoundingClientRect()
     if (!m) return
@@ -58,7 +51,7 @@ function closeMenu({ refocus = false } = {}) {
 }
 
 function pick(item) {
-  if (item.disabled) return // an option the declaration marks disabled is blocked here, for both click and Enter
+  if (item.disabled) return
   emit('update:modelValue', item.value)
   emit('change', item.value)
   closeMenu({ refocus: true })
@@ -68,7 +61,6 @@ function onTriggerClick() {
   open.value ? closeMenu() : openMenu()
 }
 
-/** Move activedescendant and keep the new option in view. */
 function moveActive(to) {
   activeIdx.value = to
   nextTick(() => document.getElementById(optionId(activeIdx.value))?.scrollIntoView({ block: 'nearest' }))
@@ -79,8 +71,7 @@ function pickActive() {
   if (item) pick(item)
 }
 
-/* Keys that act only while the menu is open.
-   ESC keeps stopPropagation without preventDefault: it must not reach an overlay behind the menu, but the browser default is harmless. */
+// Escape must close this menu without also closing an overlay behind it.
 const OPEN_KEYS = {
   Escape: (e) => { e.stopPropagation(); closeMenu({ refocus: true }) },
   ArrowDown: (e) => { e.preventDefault(); stepActive(1) },
@@ -91,7 +82,6 @@ const OPEN_KEYS = {
   ' ': (e) => { e.preventDefault(); pickActive() },
 }
 
-/** Keyboard: up and down open the menu and move activedescendant, Enter and Space select, ESC closes. */
 function onTriggerKeydown(e) {
   // While closed only the arrows act. Every other key is left to the button, so Enter and Space still click it open.
   if (!open.value) {
@@ -102,13 +92,10 @@ function onTriggerKeydown(e) {
   OPEN_KEYS[e.key]?.(e)
 }
 
-/* Closing on focus loss listens to pointerdown in the capture phase, because a click can be stopped elsewhere, for instance by @click.stop on another dropdown trigger, leaving focus moved but this menu still open.
-   Capturing focusin covers leaving by Tab.
-   A target outside root counts as focus loss. */
+/* Capture pointerdown before other controls can stop propagation; focusin also covers Tab exits. */
 function onDocFocusOut(e) {
   if (!open.value) return
-  // The teleported menu is no longer under root.
-  // Checking root alone would close the menu during pointerdown, and the click would never land on an option.
+  // The teleported menu is outside root; include it so pointerdown does not swallow option clicks.
   const inside = root.value?.contains(e.target) || menuEl.value?.contains(e.target)
   if (!inside) closeMenu()
 }
@@ -196,11 +183,6 @@ function labelOf(v) {
 </template>
 
 <style scoped>
-/*
-  A transition rather than keyframes, so toggling quickly redirects from wherever it is instead of replaying from zero.
-  The popover scales out of the trigger: origin at top centre, opening downward at the trigger width, starting at .97 and never at scale(0).
-  Exit at 120ms is faster than the 150ms entry.
-*/
 .odd-menu-enter-active { transition: opacity 150ms var(--ease-fluid), transform 150ms var(--ease-fluid); transform-origin: top center; }
 .odd-menu-leave-active { transition: opacity 120ms var(--ease-fluid), transform 120ms var(--ease-fluid); transform-origin: top center; }
 .odd-menu-enter-from,

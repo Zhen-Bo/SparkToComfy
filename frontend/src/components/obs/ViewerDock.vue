@@ -1,11 +1,4 @@
 <script setup>
-/* The bottom navigation dock sits below the viewport edge and rises when the pointer enters the bottom hot zone or Tab reaches one of its buttons.
-   It rises immediately, with no delay timer.
-   The hot zone is also part of "click outside the image to close", so clicks on the dock itself stop propagation.
-   The dock stays a ghost to hold the readability floor over bright images.
-
-   Anywhere a finger is one of the inputs, the dock stays out instead.
-   While risen it overlays the image, the usual image-viewer behaviour, so it takes no layout space and the fit maths never involves it. */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PhCaretLeft, PhCaretRight } from '@phosphor-icons/vue'
@@ -19,8 +12,7 @@ defineProps({
 })
 const emit = defineEmits(['go', 'close'])
 
-/* The dock only retracts where a pointer can bring it back.
-   A hybrid machine reports hover: hover for its mouse while a finger is still an input on it, so any-pointer: coarse keeps the dock out there too; hiding the counter behind a gesture that hand does not have would lose it. */
+/* Keep the dock visible on touch-capable hybrids even when their mouse supports hover. */
 const hoverCapable = typeof matchMedia !== 'undefined'
   && matchMedia('(hover: hover)').matches
   && !matchMedia('(any-pointer: coarse)').matches
@@ -75,8 +67,7 @@ function focusOut(e) {
 </template>
 
 <style scoped>
-/* Only a machine that can hover gets the retracting dock: 100% pushes it just off the bottom edge, and the hot zone or focus lifts it to 16px above the bottom.
-   Anywhere a finger is an input, the dock stays out permanently; the coarse rule comes last so it wins on a hybrid machine, matching the script. */
+/* The coarse-pointer rule must override hover on hybrids, matching hoverCapable above. */
 .dock-inner {
   transform: translateY(-16px);
   transition: transform 180ms var(--ease-fluid);

@@ -1,19 +1,6 @@
 <script setup>
-/**
- * The one main action button: start generating while idle, cancel while busy.
- * Four cases make it unavailable: the socket is down (HTTP would still send but no progress could come back), promptId is not known yet (the cancel API cannot be called), a cancel was already sent, and the transfer phase (cancelling means nothing there).
- * Unavailable always means aria-disabled, never the native disabled attribute, because native disabled evaporates the keyboard focus that just pressed it onto body.
- * The aria-disabled contract must then hold: onClick returns early while locked, so the action really is a no-op.
- * Otherwise a button that says it cannot be pressed would submit a generation and follow it with a failure toast.
- *
- * Cancelling asks first.
- * While busy this button is destructive, so it turns the destructive colour and a press only opens CancelRunDialog; confirm cancels.
- * The confirmation vocabulary is the one used for clearing all history, because both are irreversible and both throw work away.
- * Position, width and count never change.
- *
- * Demo mode, used by the /playground overview, only plays its own busy and recovery.
- * It starts no generation, writes no store and touches no other row, matching the pg-matrix rule that rows never drive each other.
-*/
+/* Use aria-disabled to preserve focus across job-state changes; onClick enforces it.
+   Demo mode simulates activity locally without submitting a job. */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { connection } from '@/stores/connection'
@@ -45,23 +32,21 @@ const locked = computed(() =>
       (run.busy && (run.promptId === null || LOCKED_PHASES.has(run.phase))),
 )
 
-/** Phases where a press destroys something: the button is red and asks first. */
 const CANCELLABLE = new Set(['queued', 'preparing', 'generating', 'upscaling'])
 const destructive = computed(() => !props.demo && run.busy && CANCELLABLE.has(run.phase) && !locked.value)
 
 const confirming = ref(false)
-// Close the confirmation once the job ends on its own, or is already cancelling: never leave an overlay asking to cancel something that no longer exists.
+// Dismiss the confirmation if the job stops being cancellable while the dialog is open.
 watch(() => [run.busy, run.phase], () => {
   if (!run.busy || !CANCELLABLE.has(run.phase)) confirming.value = false
 })
 
-/** Busy labels by phase. Any phase not listed is a running generation, which the press cancels. */
 const BUSY_LABEL = { cancelling: 'generate.cancelling', transfer: 'generate.transfer', queued: 'generate.cancelQueue' }
 const demoLabel = () => t(demoBusy.value ? 'generate.busy' : 'generate.start')
 
 const label = computed(() => {
   if (props.demo) return demoLabel()
-  if (!connection.wsOnline) return t('generate.connecting') // includes the first load: not connected until the first system arrives
+  if (!connection.wsOnline) return t('generate.connecting')
   if (!run.busy) return t('generate.start')
   if (run.promptId === null) return t('generate.preparing')
   return t(BUSY_LABEL[run.phase] ?? 'generate.cancelGeneration')
@@ -69,7 +54,7 @@ const label = computed(() => {
 
 function onClick() {
   if (props.demo) return runDemo()
-  if (locked.value) return // aria-disabled means the action must be a no-op; the inner guard only blocks repeat submits
+  if (locked.value) return
   if (!run.busy) return generate()
   confirming.value = true
 }

@@ -1,6 +1,4 @@
-/**
- * Theme system: five colorways, the choice is kept in localStorage. ?theme=<id> previews one without saving it, for development and screenshots. --amber is the instrument accent slot that every theme overrides.
-*/
+// ?theme=<id> previews a theme without overwriting the saved choice.
 
 export const THEMES = [
   { id: 'amber', nameKey: 'theme.amber', sw: ['#100D0B', '#1F1A15', '#E29C2F'] },

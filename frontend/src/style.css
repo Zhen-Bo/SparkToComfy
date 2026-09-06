@@ -38,8 +38,7 @@
     --muted-foreground: 32 12% 68%;
     --accent: var(--elevated);
     --accent-foreground: var(--foreground);
-    /* destructive is a theme slot too: a bright red on the dark themes, at least 4.5:1 over elevated,
-       and a deep red on daylight, at least 4.5:1 over white. */
+    /* Used as error text: preserve contrast against elevated surfaces when changing themes. */
     --destructive: 8 75% 62%;
     --destructive-foreground: 0 0% 98%;
     --border: var(--hairline);
@@ -104,9 +103,7 @@
     caret-color: hsl(var(--amber));
     -webkit-font-smoothing: antialiased;
     transition: background-color .25s, color .25s;
-    /* One path, the standard property.
-       ::-webkit-scrollbar stops working entirely once scrollbar-color is anything but auto, so keeping it would be dead code.
-       The thumb uses --control to clear the 3:1 of WCAG 1.4.11. */
+    /* Use the stronger control token so the scrollbar remains visible against dome. */
     scrollbar-color: hsl(var(--control)) hsl(var(--dome));
     scrollbar-width: thin;
     /* The :active scale is the deliberate tap feedback, so the default grey tap highlight is turned off. */
@@ -119,14 +116,11 @@
     background: hsl(var(--amber));
     color: hsl(var(--primary-foreground));
   }
-  /* 2px is the thinnest ring WCAG 2.4.13 accepts for a perimeter indicator; 1.5px broke up on a dark ground at the amber lightness step. */
   :focus-visible {
     outline: 2px solid hsl(var(--amber));
     outline-offset: 2px;
   }
-  /* Preview SVGs fill their host container so preserveAspectRatio, slice or meet, takes effect.
-     Without this rule an svg with no width or height attribute resolves height from the viewBox ratio,
-     overflows the container and gets clipped. */
+  /* Use the host size rather than the SVG's intrinsic ratio to avoid overflowing the preview. */
   .art { width: 100%; height: 100%; display: block; }
 }
 

@@ -1,8 +1,5 @@
-/**
- * Ctrl/Cmd+C copies the current image.
- * ClipboardItem accepts PNG only, so re-encoding through a canvas is the one way to cover jpeg and webp too; same-origin /v1 images do not taint the canvas.
- * The copying flag blocks repeats from a held-down shortcut, because encoding a large PNG takes hundreds of milliseconds.
-*/
+/* Normalize images to PNG for clipboard compatibility; sources must be safe to draw on a canvas.
+   Block repeated shortcuts while encoding and writing the image. */
 
 import { useI18n } from 'vue-i18n'
 import { notify, notifyError } from '@/stores/notify'

@@ -1,6 +1,3 @@
-/** The history list: load, restore, clear.
- * The cap comes from a backend response header, never hardcoded here. */
-
 import { reactive } from 'vue'
 import { clearHistory as clearHistoryApi, fetchHistory } from '@/api/comfy'
 import { INTL_LOCALE, i18n } from '@/i18n'
@@ -12,8 +9,7 @@ const { t } = i18n.global
 
 export const history = reactive({
   entries: [],
-  /* How many rows the backend returns at most (HISTORY_LIMIT in app/database.py, sent down as X-History-Limit).
-     It stays null until asked: the readout shows a dash rather than a guessed number, the same rule as sizeOf returning null. */
+  // Backend history cap; null until known so the readout can show a dash.
   limit: null,
 })
 
@@ -32,9 +28,7 @@ export async function refreshHistory() {
   }
 }
 
-/** Restore every parameter from a history entry so the image can be reproduced.
-    Not while generating: restoring swaps the workflow and the size, the viewfinder aspect ratio follows, and preview frames still arriving at the old ratio would be forced into the new frame.
-    This is the reason RatioSelector locks too, and guarding at the write point is what covers every entry into it. */
+// Guard every caller against changing the workflow and frame dimensions during a run.
 export function restoreFromHistory(entry) {
   if (run.busy) return notifyError(t('notify.restoreBusy'))
   if (!catalog.workflows.some((w) => w.id === entry.workflowId)) {
@@ -56,8 +50,6 @@ export function restoreFromHistory(entry) {
   )
 }
 
-/** Clear all history.
- * The screen is cleared only after the backend soft delete succeeds; on failure the entries stay and the user is told. */
 export async function clearHistory() {
   try {
     await clearHistoryApi()

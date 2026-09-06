@@ -1,6 +1,4 @@
 <script setup>
-/** The tab strip plus every parameter control, shared by the desktop panel and the mobile sheet.
- * Owns the tab state and the prompt expand dialog; the host supplies the header and the generate row. */
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PhTrash } from '@phosphor-icons/vue'
@@ -28,8 +26,7 @@ const pickWorkflow = (id) => { if (!locked.value) selectWorkflow(id) }
 const shown = computed(() =>
   Object.entries(workflow.value?.parameters?.[tab.value === 'create' ? 'basic' : 'advanced'] ?? {}),
 )
-// Groups are separated by the edgeline in obs-label::after, so the label rule is the group rule.
-// Sections carry no border of their own, which would double up with that rule.
+// obs-label::after provides group dividers; avoid adding a second section border.
 const startsGroup = (i) => i > 0 && shown.value[i][1].type !== shown.value[i - 1][1].type
 
 // The backend supplies control keys, which also identify their translations.
@@ -44,11 +41,11 @@ const itemsOf = (ctl) =>
 const lenOf = (name) => catalog.params[name]?.length ?? 0
 // How the prompts split the scroll area's leftover height.
 const FILL = { quality: 0.2, positive: 0.6, negative: 0.2 }
-// Diff marks after a restore; stringify covers the size object and the lora array at once, and the params are small.
+// Params are small JSON values, including nested size and LoRA data, so compare serialized values.
 const isDirty = (name) =>
   catalog.restoredBaseline != null &&
   JSON.stringify(catalog.params[name]) !== JSON.stringify(catalog.restoredBaseline[name])
-// Only the controls of the current tab are rendered, so a dirty mark on a hidden tab would be invisible: it is lifted onto the tab strip instead.
+// Surface edits on hidden controls through their tab's dirty mark.
 const groupOf = (tabId) => workflow.value?.parameters?.[tabId === 'create' ? 'basic' : 'advanced'] ?? {}
 const dirtyTabs = computed(() =>
   ['create', 'tuning'].filter((id) => Object.keys(groupOf(id)).some(isDirty)),

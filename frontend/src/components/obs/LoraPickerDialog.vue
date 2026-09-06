@@ -64,10 +64,8 @@ function confirm() {
   catalog.params.lora = sel.value.map(({ file, strength }) => ({ file, strength }))
   close()
 }
-/* The full hover preview follows the cursor, the same contract as the picked list in LoraField:
-   teleported to body because the wall is an overflow scroll area that would clip an overlay inside.
-   The box hugs the real cover ratio: an <img> with only max constraints keeps its intrinsic ratio, so no measuring.
-   Touch ends a tap with synthetic mouse events; the recency guard keeps them from pinning the overlay on screen. */
+/* Teleport outside the scroll area to avoid clipping.
+   Ignore synthetic mouse events after touch so a tap cannot leave the preview open. */
 const PREVIEW_MAX_W = 380
 const PREVIEW_MAX_H = 460
 const CURSOR_GAP = 16
@@ -184,7 +182,6 @@ onBeforeUnmount(hidePreview)
       <p v-if="full" role="status">{{ t('lora.picker.limit') }}</p>
       <div><button type="button" class="lora-secondary" @click="close">{{ t('lora.picker.cancel') }}</button><button type="button" class="lora-confirm" @click="confirm">{{ t('lora.picker.confirm') }}</button></div>
     </footer>
-    <!-- Full hover preview: fixed and following the cursor, taking no layout space -->
     <Teleport to="body">
       <div
         v-if="open && preview"

@@ -1,14 +1,4 @@
 <script setup>
-/* The history image viewer: the frame, the image-swap transition and keyboard routing.
-   The zoom and pan geometry lives in lib/useZoomPan.js and copying in lib/useCopyImage.js;
-   the parameter panel and the bottom dock are each their own component.
-
-   Behaviour:
-   - opening or switching fits the image (scale = minScale), the ceiling is 400% and the zoom factor is never displayed
-   - left and right always switch images; a horizontal touch swipe switches them too, and below 960px the solid edge buttons are gone
-   - panning is a drag once zoomed in, or Shift plus an arrow key; there are solid edge buttons plus the bottom dock
-   - switching is a directional slide and cross-fade through a keyed remount inside a <Transition>, so the fit reset never runs through a transform transition and nothing jumps
-   - the key hints sit at the top left, the dock at the bottom: both are translucent (.obs-ghost); a resize recomputes the floor */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useModalLayer } from '@/lib/useModalLayer'
 import { useCopyImage } from '@/lib/useCopyImage'
@@ -37,9 +27,8 @@ const viewerRoot = ref(null)
 const entry = computed(() => props.entries[idx.value])
 const p = computed(() => entry.value.params)
 
-/* The size has two uses with different sources.
-   The readout must be honest: an unknown preset shows a dash rather than an invented 1x1.
-   The geometry comes from the file (DESIGN.md: the aspect ratio comes from the file). The preset is the reservation that draws the box before the image arrives, so the evidence never shifts, and the file takes over as it loads. */
+/* Reserve geometry from the preset until the file's actual dimensions arrive.
+   Keep the unknown-preset readout separate from the 1x1 layout fallback. */
 const shownDims = computed(() => sizeOf(entry.value.workflowId, p.value.size))
 const natural = ref(null)
 const dims = computed(() => natural.value ?? shownDims.value ?? { width: 1, height: 1 })
@@ -48,12 +37,10 @@ function onImgLoad(e) {
   if (!w || !h) return
   const reservedWrongRatio = Math.abs(dims.value.width / dims.value.height - w / h) > 1e-3
   natural.value = { width: w, height: h }
-  if (reservedWrongRatio) fitToStage() // the frame just changed shape, so the fit has to be taken again
+  if (reservedWrongRatio) fitToStage()
 }
 
-/* A history entry can outlive its file: the record stays in the database after ComfyUI's output is cleared.
-   The frame then keeps the preset shape and states the failure, the same rule the LoRA covers follow, so the browser never draws a broken-image icon.
-   An entry that carries no image at all takes the same path, because there is no file to point the image element at. */
+// History records can outlive files deleted from ComfyUI; show a placeholder for missing images.
 const failed = ref(false)
 const src = computed(() => entry.value.images?.[0] ?? null)
 const showImage = computed(() => !!src.value && !failed.value)
@@ -64,10 +51,8 @@ const {
 } = useZoomPan(dims)
 
 const { toClipboard } = useCopyImage()
-const copyImage = () => { if (showImage.value) toClipboard(src.value) } // nothing to put on the clipboard when the file is gone
+const copyImage = () => { if (showImage.value) toClipboard(src.value) }
 
-/** Left and right always switch.
- * A switch resets to fit and plays the directional slide. */
 function go(d) {
   slideDir.value = d
   natural.value = null // the next file reserves from its own preset, then corrects itself on load
@@ -93,7 +78,7 @@ watch(idx, () => {
   if (strip && cur) strip.scrollTo({ left: cur.offsetLeft - strip.clientWidth / 2 + cur.clientWidth / 2, behavior: 'smooth' })
 })
 
-const SWIPE_MIN = 64 // px; |dx| also has to beat |dy| by half again below, or the drag was diagonal
+const SWIPE_MIN = 64 // px
 let touchCount = 0
 let swipeFrom = null
 let swipedAt = 0
@@ -103,7 +88,7 @@ const swipeDirection = (dx) => (dx < 0 ? 1 : -1)
 function onStagePointerDown(e) {
   if (e.pointerType !== 'touch') return
   touchCount++
-  // one finger, still at the fit: a pinch or a pan is not a swipe
+  // Reserve multi-touch and scales above 1 for pinch/pan rather than image switching.
   swipeFrom = touchCount === 1 && scale.value <= 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null
 }
 function onStagePointerUp(e) {
@@ -127,8 +112,7 @@ function onStageClick(e) {
   emit('close')
 }
 
-/** Focus loop: Tab stays inside the overlay, cycling between its first and last stop, a second guard beside inert.
- * The scrollable parameter list is a stop too, not only the buttons, so it cannot fall outside the loop. */
+// Include explicit tab stops as well as buttons in the modal focus loop.
 function cycleFocus(e) {
   const els = viewerRoot.value?.querySelectorAll('button:not([disabled]), [tabindex="0"]') ?? []
   if (!els.length) return
@@ -138,8 +122,6 @@ function cycleFocus(e) {
   else if (!e.shiftKey && (!inside || active === els[els.length - 1])) { e.preventDefault(); els[0].focus() }
 }
 
-/** Shift plus an arrow key pans once zoomed in.
- * Unmodified left and right still switch images. */
 function panWithArrows(key) {
   if (key === 'ArrowLeft') panBy(PAN_STEP, 0)
   if (key === 'ArrowRight') panBy(-PAN_STEP, 0)
@@ -147,8 +129,6 @@ function panWithArrows(key) {
   if (key === 'ArrowDown') panBy(0, -PAN_STEP)
 }
 
-/* Unmodified keys, each one its own entry.
-   Only the arrows take preventDefault, because only they collide with a browser default (scrolling the page). */
 const KEYS = {
   Escape: () => emit('close'),
   Tab: cycleFocus,
@@ -162,7 +142,6 @@ const KEYS = {
 }
 
 function onKeydown(e) {
-  // Ctrl or Cmd plus C copies the current image to the system clipboard, matching the browser right-click "copy image" convention
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
     e.preventDefault()
     return copyImage()
@@ -174,17 +153,14 @@ function onKeydown(e) {
   KEYS[e.key]?.(e)
 }
 
-// Accessibility: the background goes inert on open and focus moves to the close button.
-// After closing, HistoryRail returns focus to the card that opened it.
 useModalLayer(closeBtn)
 onMounted(() => {
-  fitToStage() // fit as soon as it opens
+  fitToStage()
   document.addEventListener('keydown', onKeydown)
 })
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
-/* No restoring while generating, for the same reason as RatioSelector and the workflow dropdown.
-   It uses aria-disabled rather than disabled so focus does not evaporate onto body, and restoreFromHistory guards itself too, because this overlay is not the only way in. */
+// aria-disabled preserves focus but does not block clicks, so guard the action explicitly.
 function backfill() {
   if (locked.value) return
   restoreFromHistory(entry.value)
@@ -207,8 +183,6 @@ function backfill() {
 
       <div class="sr-only" aria-live="polite">{{ t('viewer.counter', { n: idx + 1, total: entries.length }) }}</div>
 
-      <!-- Source order is reading order, so Tab follows the screen: the top-left column, the top-right actions,
-           then the stage arrows, then the dock at the bottom. Stacking is set by z-index, not by this order. -->
       <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline">
         <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
           <span class="flex items-center gap-1 whitespace-nowrap"><PhArrowsOutSimple class="h-3.5 w-3.5" aria-hidden="true" /><span class="max-[959px]:hidden">{{ t('viewer.hintZoom') }}</span><span class="min-[960px]:hidden">{{ t('viewer.hintPinch') }}</span></span>
@@ -216,10 +190,7 @@ function backfill() {
         </div>
       </div>
 
-      <!-- On the phone the actions sit in one row: backfill left of close -->
       <div class="absolute right-5 top-5 z-20 flex flex-col gap-2.5 max-[959px]:flex-row-reverse">
-        <!-- Close is a leaving action, so hover only brightens it neutrally.
-             Amber is reserved for the CTA, the active state and readouts -->
         <button
           ref="closeBtn"
           type="button"
@@ -248,8 +219,7 @@ function backfill() {
         @pointerup="onStagePointerUp"
         @pointercancel="onStagePointerCancel"
       >
-        <!-- Swap transition: a keyed remount plus a directional slide and cross-fade.
-             The new node mounts already fitted, so the fit reset never runs through a transform transition and nothing jumps -->
+        <!-- Remount at the fitted size so switching images does not animate the zoom reset. -->
         <Transition :name="slideDir > 0 ? 'swap-next' : 'swap-prev'" mode="out-in">
           <div :key="idx" class="swap-item">
             <div
@@ -276,7 +246,6 @@ function backfill() {
                 @load="onImgLoad"
                 @error="failed = true"
               />
-              <!-- The frame keeps the preset shape so the surrounding layout does not move, and says what happened instead of showing an empty box -->
               <div
                 v-else
                 class="flex h-full w-full flex-col items-center justify-center gap-3 border border-hairline bg-plate-bg px-6 text-center"
@@ -339,8 +308,7 @@ function backfill() {
 </template>
 
 <style scoped>
-/* The swap slide: next sends the old image out left and brings the new one in from the right, previous reverses it.
-   Both directions animate the wrapper only, never the transform on the image frame itself. */
+/* Animate the wrapper so slide transitions do not overwrite the image's zoom/pan transform. */
 .swap-next-enter-active,
 .swap-next-leave-active,
 .swap-prev-enter-active,
@@ -375,9 +343,7 @@ function backfill() {
   .stage-nav { display: none; }
 }
 
-/* The overlay enters with opacity plus a .98 scale from the centre; the backdrop blur is constant and never transitions.
-   Closing is handled by <Transition name="viewer"> in HistoryRail, and its 140ms exit is faster than the entry.
-   During the exit, animation: none drops the fill, or the frozen end values of the entry keyframe would override the exit transition. */
+/* Clear the entry animation on exit so its fill values cannot override the leave transition. */
 .viewer-root { animation: viewerIn .2s var(--ease-fluid) both; }
 @keyframes viewerIn {
   from { opacity: 0; transform: scale(.98); }

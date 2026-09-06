@@ -20,7 +20,6 @@ function place() {
   const r = root.value.getBoundingClientRect()
   menuStyle.value = { left: `${r.left}px`, top: `${r.bottom + 6}px` }
 }
-/** Menu semantics: opening moves focus to the current theme item; closing can return it to the trigger. */
 async function toggle() {
   if (!open.value) place()
   open.value = !open.value
@@ -40,8 +39,7 @@ function moveFocus(step) {
   const at = items.indexOf(document.activeElement)
   items[(at + step + items.length) % items.length]?.focus()
 }
-/* Keys inside the menu, one entry each: up/down move, Home/End jump, ESC closes and returns focus, Tab closes.
-   Tab keeps its default so focus leaves the menu the normal way; every other key takes preventDefault. */
+// Preserve Tab's default action so focus can leave after the menu closes.
 const MENU_KEYS = {
   Escape: (e) => { e.preventDefault(); closeMenu({ refocus: true }) },
   Tab: () => closeMenu(),
@@ -139,11 +137,6 @@ function pick(id) {
 </template>
 
 <style scoped>
-/*
-  The theme menu uses a transition, so rapid clicks redirect it instead of dropping frames.
-  It scales out of the trigger: anchored to the trigger top-left corner, with transform-origin top left, starting at .97.
-  Exit at 120ms is faster than the 150ms entry.
-*/
 .ts-menu-enter-active { transition: opacity 150ms var(--ease-fluid), transform 150ms var(--ease-fluid); transform-origin: top left; }
 .ts-menu-leave-active { transition: opacity 120ms var(--ease-fluid), transform 120ms var(--ease-fluid); transform-origin: top left; }
 .ts-menu-enter-from,
