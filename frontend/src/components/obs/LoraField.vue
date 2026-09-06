@@ -198,7 +198,7 @@ function onCoverLoad(e, file) {
   repositionLoadedPreview(file)
 }
 /* Being full does not use the native disabled attribute.
-   When confirming the fifth LoRA closes the dialog, radix returns focus to this button, and native disabled would drop that focus onto body, the same evaporation problem as GenerateButton. aria-disabled plus this early return is enough. */
+   When confirming the last allowed LoRA closes the dialog, radix returns focus to this button, and native disabled would drop that focus onto body, the same evaporation problem as GenerateButton. aria-disabled plus this early return is enough. */
 function openPicker() {
   if (picked.value.length >= LORA_MAX) return
   open.value = true
