@@ -3,6 +3,7 @@
  * Owns the tab state and the prompt expand dialog; the host supplies the header and the generate row. */
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { PhTrash } from '@phosphor-icons/vue'
 import { LORA_MAX, catalog, selectWorkflow, workflow } from '@/stores/catalog'
 import { connection } from '@/stores/connection'
 import { locked } from '@/stores/run'
@@ -13,6 +14,7 @@ import LoraField from '@/components/obs/LoraField.vue'
 import ParamSlider from '@/components/obs/ParamSlider.vue'
 import PanelTabs from '@/components/obs/PanelTabs.vue'
 import Textarea from '@/components/ui/Textarea.vue'
+import Dialog from '@/components/ui/Dialog.vue'
 import PromptExpandDialog from '@/components/obs/PromptExpandDialog.vue'
 
 // the tab ids map to the backend's parameter groups: create → basic, tuning → advanced
@@ -55,6 +57,20 @@ const dirtyTabs = computed(() =>
   ['create', 'tuning'].filter((id) => Object.keys(groupOf(id)).some(isDirty)),
 )
 
+const clearLorasOpen = ref(false)
+let clearLorasOpener = null
+function askClearLoras(event) {
+  if (!(catalog.params.lora ?? []).length) return
+  clearLorasOpener = event.currentTarget
+  clearLorasOpen.value = true
+}
+watch(clearLorasOpen, (open) => {
+  if (!open) nextTick(() => clearLorasOpener?.focus())
+})
+function confirmClearLoras() {
+  catalog.params.lora = []
+  clearLorasOpen.value = false
+}
 const expanded = ref(null)
 const expandedCtl = computed(() =>
   expanded.value ? { ...groupOf('create'), ...groupOf('tuning') }[expanded.value] : null,
@@ -138,6 +154,15 @@ const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
             <path d="M7 1h4v4M11 1 6.8 5.2M5 11H1V7M1 11l4.2-4.2" />
           </svg>
         </button>
+        <button
+          v-if="ctl.type === 'lora'"
+          type="button"
+          class="obs-tr relative order-last -my-1.5 flex h-6 w-6 flex-none items-center justify-center self-center rounded-sm border border-destructive/60 text-destructive before:absolute before:-inset-2 before:content-[''] hover:bg-destructive/10 active:scale-95 aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+          :aria-label="t('lora.picker.clearAll')"
+          :title="t('lora.picker.clearAll')"
+          :aria-disabled="!(catalog.params.lora ?? []).length"
+          @click="askClearLoras"
+        ><PhTrash class="h-[18px] w-[18px]" weight="bold" aria-hidden="true" /></button>
       </h2>
 
       <ObsDropdown
@@ -179,6 +204,15 @@ const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
       </span>
     </section>
   </div>
+
+  <Dialog :open="clearLorasOpen" max-width="340px" content-class="p-5" @update:open="clearLorasOpen = $event">
+    <template #title><h2 class="text-[13.5px] font-bold text-foreground">{{ t('lora.picker.clearTitle') }}</h2></template>
+    <template #description><p class="mt-2 text-[12px] leading-relaxed text-muted-foreground">{{ t('lora.picker.clearDescription', { count: (catalog.params.lora ?? []).length }) }}</p></template>
+    <div class="mt-4 flex justify-end gap-2">
+      <button type="button" class="obs-tr min-h-10 rounded-sm border border-control px-3 text-[12px] text-muted-foreground hover:border-amber hover:text-foreground" @click="clearLorasOpen = false">{{ t('lora.picker.cancel') }}</button>
+      <button type="button" class="obs-tr min-h-10 rounded-sm border border-destructive/60 px-3 text-[12px] text-destructive hover:bg-destructive/10" @click="confirmClearLoras">{{ t('lora.picker.clearAll') }}</button>
+    </div>
+  </Dialog>
 
   <PromptExpandDialog
     :name="expanded"

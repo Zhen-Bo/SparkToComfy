@@ -11,6 +11,7 @@ const props = defineProps({
   max: { type: Number, default: 100 },
   step: { type: Number, default: 1 },
   class: { type: String, default: '' },
+  disabled: { type: Boolean, default: false },
   ariaLabel: { type: String, default: null },
   // Spoken value. radix writes aria-valuenow from the raw number, so "1" is read for a CFG shown as "1.0"; this carries the formatted text instead.
   ariaValuetext: { type: String, default: null },
@@ -26,6 +27,7 @@ const emit = defineEmits(['update:modelValue'])
     :min="min"
     :max="max"
     :step="step"
+    :disabled="disabled"
   >
     <!-- A 24px transparent hit band wraps the 3px visual track: radix computes the seek position from the track element, so the padding above and below does not change the value.
          24px is the WCAG 2.5.8 minimum. The spacing exception does not cover this control: the readout button sits 12px away, so the 24px circles around the two would overlap. -->

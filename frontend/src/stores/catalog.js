@@ -2,7 +2,7 @@
 
 import { computed, reactive } from 'vue'
 
-export const LORA_MAX = 5
+export const LORA_MAX = 10
 
 export const catalog = reactive({
   // Catalog data, loaded by the API layer
