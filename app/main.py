@@ -1,9 +1,4 @@
-"""The outer app serves the SPA; the API and the WebSocket live in a sub-app under /v1.
-
-Starlette matches a Mount by prefix, so every path below /v1 enters the sub-app and an unknown route gets the sub-app's own JSON 404.
-The SPA catch-all can never shadow it, so no reserved-prefix list is needed.
-Docs follow the sub-app: /v1/docs, /v1/openapi.json, /v1/redoc.
-"""
+"""Mount /v1 separately so unknown API paths return JSON 404, never the SPA."""
 
 import asyncio
 from contextlib import asynccontextmanager, suppress
@@ -45,11 +40,7 @@ async def _reload_loop(catalog: WorkflowCatalog) -> None:
 
 
 async def _reconcile_loop(rt: runtime.Runtime) -> None:
-    """Compare the ComfyUI queue against the jobs in flight, on a fixed beat.
-
-    Nothing here is needed while every ComfyUI event arrives; it exists for the case where one
-    does not. A pass that raises must not end the beat, or the safety net is gone for good.
-    """
+    """Recover missed events; a failed pass must not stop future reconciliation."""
     while True:
         await asyncio.sleep(RECONCILE.interval_seconds)
         try:
@@ -60,16 +51,12 @@ async def _reconcile_loop(rt: runtime.Runtime) -> None:
             logger.exception("Reconcile pass failed, retrying on the next beat")
 
 
-# Socket.IO's pingInterval. The frontend watchdog (PING_TIMEOUT_MS in frontend/src/api/comfy.js) allows 45 s without a frame.
+# Must stay below PING_TIMEOUT_MS in frontend/src/api/comfy.js.
 PING_SECONDS = 25
 
 
 async def _heartbeat_loop(hub: WsHub) -> None:
-    """A frame the browser can see, on a fixed beat.
-
-    uvicorn pings every socket at the protocol level, but a page cannot observe those, so a socket
-    that died silently looks open to it forever. This frame is what its watchdog counts.
-    """
+    """Browser watchdogs cannot observe uvicorn's protocol-level pings."""
     while True:
         await asyncio.sleep(PING_SECONDS)
         await hub.send_to_all(PingMessage())

@@ -1,7 +1,4 @@
-"""Admission and cancellation: only whether this request is allowed.
-
-Event progression lives in app/jobs/events.py.
-"""
+"""Submit and cancel requests; events.py owns lifecycle progression."""
 
 import uuid
 
@@ -136,6 +133,5 @@ class JobsService:
             await self.ctx.comfy.cancel_job(prompt_id)
         except httpx.HTTPError as err:
             raise HTTPException(status_code=502, detail="comfyui_unreachable") from err
-        # ComfyUI drops a job that had not started yet without reporting anything, so the queue is
-        # the only place the answer appears. Look now rather than wait for the next beat.
+        # Cancelling a queued job emits no event; reconcile now to release its slot.
         await self.events.refresh_positions()

@@ -1,10 +1,4 @@
 <script setup>
-/**
- * Full-page confirmation (alertdialog) for clearing all history.
- * A mask plus a centred panel (obs-elevated with the obs-corners viewfinder brackets).
- * No timed steps: focus lands on the safe default, back; Tab cycles between the two buttons; ESC or a click on the mask goes back; only confirm clears.
- * Outer behaviour matches HistoryViewer: teleported to body, with #app inert while open.
-*/
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useModalLayer } from '@/lib/useModalLayer'
 import { useI18n } from 'vue-i18n'
@@ -12,7 +6,6 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 
 const props = defineProps({
-  /** How many images will be cleared; the readout inside the description. */
   count: { type: Number, required: true },
 })
 const emit = defineEmits(['confirm', 'cancel'])
@@ -22,14 +15,13 @@ const yesBtn = ref(null)
 
 function onKeydown(e) {
   if (e.key === 'Escape') return emit('cancel')
-  // Focus loop: two buttons cycling into each other, a second guard beside inert, the same as HistoryViewer.
   if (e.key === 'Tab') {
     e.preventDefault()
     ;(document.activeElement === backBtn.value ? yesBtn : backBtn).value?.focus()
   }
 }
 
-// The shared overlay layer handles the inert background and moves focus to the safe default, back.
+// Start on the non-destructive action.
 useModalLayer(backBtn)
 onMounted(() => document.addEventListener('keydown', onKeydown))
 onUnmounted(() => document.removeEventListener('keydown', onKeydown))
@@ -75,11 +67,6 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 </template>
 
 <style scoped>
-/*
-  Entry and exit use a Vue Transition, so an interruption redirects instead of replaying from zero.
-  The mask animates opacity only; the panel animates opacity plus a slight scale.
-  Exit at 130ms is faster than the 160ms entry, because leaving should be decisive.
-*/
 .chd-enter-active .chd-mask  { transition: opacity 160ms ease-out; }
 .chd-leave-active .chd-mask  { transition: opacity 130ms ease-out; }
 .chd-enter-from   .chd-mask,

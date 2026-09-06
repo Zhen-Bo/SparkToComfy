@@ -1,8 +1,4 @@
-"""Load the settings and workflows under config/.
-
-Settings are read once at startup, so a bad path or format fails the boot outright.
-A WorkflowCatalog holds the workflow declarations and a background task reloads them periodically: the catalog is part of the Runtime, not a module global.
-"""
+"""Settings load at import; each Runtime owns a reloadable workflow catalog."""
 
 import json
 from collections.abc import Mapping
@@ -15,8 +11,7 @@ from pydantic_settings import SettingsConfigDict
 from app.jobs import controls
 from app.settings import ROOT, TomlSettings
 
-# The registry a deployment edits.
-# It is git-ignored, so the tests read the shipped example instead.
+# Deployment-local and git-ignored; tests use the shipped example.
 REGISTRY = ROOT / "config" / "workflow.yaml"
 
 
@@ -68,7 +63,7 @@ class WorkflowCatalog:
         return self._workflows.get(workflow_id)
 
     def reload(self) -> None:
-        """Swap the whole set. A failed load propagates; the caller decides whether to keep the old one."""
+        """Replace the catalog only after a complete load succeeds."""
         self._workflows = load_workflows(self._registry)
 
 

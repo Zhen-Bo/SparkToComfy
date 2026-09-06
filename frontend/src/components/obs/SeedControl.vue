@@ -10,31 +10,26 @@ const { t } = useI18n()
 const seed = computed(() => catalog.params.seed ?? -1)
 
 function onInput(e) {
-  // Digits 0-9 only.
-  // An empty field means -1 (random); only the dice button sets random.
+  // An empty field means -1 (random).
   const digits = e.target.value.replace(/\D/g, '')
   e.target.value = digits
   catalog.params.seed = digits === '' ? -1 : parseInt(digits, 10)
 }
-// -1 is the readout for random.
-// Focus selects it all so new input replaces it instead of merging with what is left behind, which would turn a typed 3 into 13.
+// Select the random sentinel so new input does not merge with its digit.
 function onFocus(e) {
   if (seed.value === -1) e.target.select()
 }
-// On blur with no new value, still random, restore the -1 readout.
 function onBlur(e) {
   if (seed.value === -1) e.target.value = '-1'
 }
 function roll() {
-  catalog.params.seed = -1 // -1 means random
+  catalog.params.seed = -1
 }
 </script>
 
 <template>
   <div class="flex gap-[7px]">
     <div class="relative flex-1">
-      <!-- Random shows the -1 readout plus the random badge.
-           Focus selects it all so the next keystroke replaces it, see the script above. -->
       <input
         type="text"
         inputmode="numeric"

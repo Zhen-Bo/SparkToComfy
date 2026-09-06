@@ -1,17 +1,10 @@
 """End-to-end checks against a real ComfyUI.
 
-These really generate images, so the whole module carries the `e2e` marker and
-`addopts = "-m 'not e2e'"` skips it by default. Run it with `uv run pytest -m e2e`.
-The module skips itself when ComfyUI is unreachable.
+Run explicitly with `uv run pytest -m e2e`: this generates real images and skips
+when ComfyUI is unreachable. The default test run excludes this module.
 
-Everything runs in-process:
-* HTTP goes through the httpx ASGITransport, whose `client=` argument sets the source IP.
-* WebSocket goes through AsgiWs in conftest, because ASGITransport has no WebSocket support.
-* No real server means nobody runs lifespan, so the module opens it once (`_lifespan`).
-
-The checks depend on each other in time: an image must exist before history, the image
-proxy or a soft delete can be checked. Module-scoped fixtures carry those dependencies,
-so running any single test on its own still sets its prerequisites up.
+The app runs in-process, so fixtures open lifespan and drive WebSockets via AsgiWs.
+Module-scoped producing fixtures make individual tests independent of test order.
 """
 
 import asyncio
@@ -56,8 +49,6 @@ if not _comfy_reachable():
 SESSION = "e2e-check-f4-a"
 SESSION_B = "e2e-check-f4-b"
 IP2 = "127.0.0.2"
-# The one set of valid values lives in conftest.
-# Only the two fields that must change are overridden here.
 PARAMS = {**EXAMPLE_VALUES, "positive": "a red apple on a table", "seed": -1}
 
 
@@ -183,7 +174,6 @@ async def wait_receipt(ws, timeout=15):
         return m["promptId"]
 
 
-# The exact key set of every job message, by status.
 JOB_KEYS = {
     "queued": {"type", "status", "position", "etaSeconds"},
     "running": {"type", "status"},
@@ -244,10 +234,7 @@ async def wait_done(ws, timeout):
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def first_run(api_client):
-    """Accept, in-flight, done and one more image, all on a single WebSocket connection.
-
-    Splitting these apart would leave nothing in flight to check, so the actions stay together and each assertion becomes its own test.
-    """
+    """Keep submissions together so dependent tests can inspect an in-flight rejection."""
     async with open_ws(SESSION) as ws:
         await expect_system(ws, "connect-1")
         accepted = await post_json(api_client, "/v1/generate", body_of())
@@ -286,10 +273,6 @@ async def image_url(history_row):
 
 
 async def submit_then_cancel(client, ws, body, canceller):
-    """Submit, take the receipt, cancel, wait for the terminal message.
-
-    Cancelling a queued job and resubmitting after a cancel both run through this.
-    """
     accepted = await post_json(client, "/v1/generate", body)
     pid = await wait_receipt(ws)
     cancelled = await post_json(

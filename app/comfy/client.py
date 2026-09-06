@@ -1,9 +1,4 @@
-"""The ComfyUI boundary: HTTP through httpx, the event stream through websockets.
-
-Exceptions go out unchanged. httpx.HTTPStatusError carries the status code and
-httpx.RequestError separates "cannot connect" from "timed out", so the router layer
-decides which HTTP status each one becomes.
-"""
+"""Preserve transport errors for callers; prompt rejection uses ComfyError."""
 
 import asyncio
 import json
@@ -87,8 +82,6 @@ class ComfyClient:
     async def aclose(self) -> None:
         await self.http.aclose()
 
-    # --- HTTP ---
-
     async def _get_json(self, path: str, params: dict | None = None) -> dict:
         resp = await self.http.get(path, params=params)
         resp.raise_for_status()
@@ -160,8 +153,6 @@ class ComfyClient:
             raise
         return resp
 
-    # --- event stream ---
-
     async def _on_message(self, on_event, raw) -> None:
         if isinstance(raw, bytes):
             if len(raw) < 8:
@@ -200,10 +191,7 @@ class ComfyClient:
                 await self._on_message(on_event, raw)
 
     async def listen(self, on_event) -> None:
-        """Read while connected, back off and reconnect when dropped.
-
-        Only cancellation leaves this loop.
-        """
+        """Retry connection failures with backoff; propagate cancellation."""
         delay = RETRY_FIRST
         logged = False
         while True:

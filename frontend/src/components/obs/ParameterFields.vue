@@ -1,6 +1,4 @@
 <script setup>
-/** The tab strip plus every parameter control, shared by the desktop panel and the mobile sheet.
- * Owns the tab state and the prompt expand dialog; the host supplies the header and the generate row. */
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PhTrash } from '@phosphor-icons/vue'
@@ -17,7 +15,6 @@ import Textarea from '@/components/ui/Textarea.vue'
 import Dialog from '@/components/ui/Dialog.vue'
 import PromptExpandDialog from '@/components/obs/PromptExpandDialog.vue'
 
-// the tab ids map to the backend's parameter groups: create → basic, tuning → advanced
 const { t } = useI18n()
 const tab = ref('create')
 
@@ -26,16 +23,13 @@ const workflowItems = computed(() => catalog.workflows.map((w) => ({ value: w.id
    inert stops a real click; the guard catches a programmatic one. */
 const pickWorkflow = (id) => { if (!locked.value) selectWorkflow(id) }
 
-// Control order is the order the backend returns; nothing is reordered.
 const shown = computed(() =>
   Object.entries(workflow.value?.parameters?.[tab.value === 'create' ? 'basic' : 'advanced'] ?? {}),
 )
-// Groups are separated by the edgeline in obs-label::after, so the label rule is the group rule.
-// Sections carry no border of their own, which would double up with that rule.
+// obs-label::after provides group dividers; avoid adding a second section border.
 const startsGroup = (i) => i > 0 && shown.value[i][1].type !== shown.value[i - 1][1].type
 
-/** Control names come from i18n.
- * The backend sends no label, so the control key it returns (model, steps and so on) is the i18n key. */
+// The backend supplies control keys, which also identify their translations.
 const labelOf = (name) => t(`params.${name}`)
 
 /** Dropdown options are a dictionary: the key is the submitted value and the value is either a label string or {label, disabled?}. */
@@ -47,11 +41,11 @@ const itemsOf = (ctl) =>
 const lenOf = (name) => catalog.params[name]?.length ?? 0
 // How the prompts split the scroll area's leftover height.
 const FILL = { quality: 0.2, positive: 0.6, negative: 0.2 }
-// Diff marks after a restore; stringify covers the size object and the lora array at once, and the params are small.
+// Params are small JSON values, including nested size and LoRA data, so compare serialized values.
 const isDirty = (name) =>
   catalog.restoredBaseline != null &&
   JSON.stringify(catalog.params[name]) !== JSON.stringify(catalog.restoredBaseline[name])
-// Only the controls of the current tab are rendered, so a dirty mark on a hidden tab would be invisible: it is lifted onto the tab strip instead.
+// Surface edits on hidden controls through their tab's dirty mark.
 const groupOf = (tabId) => workflow.value?.parameters?.[tabId === 'create' ? 'basic' : 'advanced'] ?? {}
 const dirtyTabs = computed(() =>
   ['create', 'tuning'].filter((id) => Object.keys(groupOf(id)).some(isDirty)),
@@ -85,10 +79,7 @@ watch(expanded, (v) => {
   if (!v) nextTick(() => opener?.focus())
 })
 const decimalsOf = (ctl) => (ctl.valueKind === 'int' ? 0 : String(ctl.step).split('.')[1]?.length ?? 1)
-/** The range readout on the label row.
- * The decimal places follow that control's step, so a 0-7 range never sits next to a CFG of 1.0 in a different format. */
 const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
-// rows comes from the backend declaration, required for multiline; a missing one fails the boot.
 </script>
 
 <template>
@@ -129,7 +120,6 @@ const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
           :class="lenOf(name) > ctl.maxLength * 0.9 ? 'text-amber-bright' : 'text-ink-faint'"
           translate="no"
         >{{ lenOf(name) }}/{{ ctl.maxLength }}</span>
-        <!-- The usable range of a slider, in the same slot and the same type role as the character counter -->
         <span
           v-else-if="ctl.type === 'input'"
           class="font-mono text-[11px] tracking-normal tabular-nums text-ink-faint"

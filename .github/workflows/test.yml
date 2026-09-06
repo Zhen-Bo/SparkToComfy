@@ -1,6 +1,6 @@
 name: Test
 
-# Called by ci.yml on every push to main and by release.yml before it builds the image, so both gates run the exact same checks.
+# Shared by CI and release so both use the same verification gate.
 on:
   workflow_call:
 
@@ -10,20 +10,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # setup-uv publishes no floating major tag, so the exact version is the only thing that resolves.
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
           cache-python: true
 
-      # --locked fails when uv.lock drifted from pyproject.toml instead of quietly relocking.
       - run: uv sync --locked
 
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pyright
-      # app.main only mounts the SPA routes when frontend/dist exists, so the test that covers the /v1 mount against the catch-all needs a real build to run against.
-      # It also means a broken frontend fails here instead of at release time.
+      # Build before pytest: app.main mounts SPA routes only when frontend/dist exists.
       - uses: actions/setup-node@v5
         with:
           node-version: 22

@@ -1,15 +1,5 @@
 <script setup>
-/**
- * Enlarged prompt editing.
- *
- * The panel column is 267px, which at 12px monospace fits 33 characters per line, while a single tag runs 10 to 20 characters.
- * Every wrap therefore looks ragged, and a hyphenated tag such as `ultra-detailed` breaks across two lines.
- * No CSS stops a hyphen break inside a <textarea>: word-break, text-wrap, line-break and hyphens all produce identical output.
- * Column width is the only variable, so this dialog widens it to roughly 80 characters and there is simply less wrapping.
- *
- * It writes catalog.params[name] directly with no draft state, because the flow is fill in and submit.
- * Undo is covered by the dirty marks on a restored run.
-*/
+// Edits update the panel immediately; closing this dialog does not discard them.
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { catalog } from '@/stores/catalog'
@@ -26,9 +16,7 @@ const emit = defineEmits(['close'])
 
 const { t } = useI18n()
 
-/* radix Presence waits for the exit animation before unmounting (see the note in ui/Dialog.vue), but name and ctl are already null the moment it closes.
-   Reading ctl.maxLength would throw a TypeError during the exit, and a failed render stalls the close, leaving the overlay stuck open.
-   So the last values are kept for those exit frames; whether it is open still depends only on the props. */
+/* Props clear before Radix's exit animation ends; retain the last values for the remaining renders. */
 const last = ref({ name: null, ctl: null, label: '' })
 watch(
   () => props.ctl,

@@ -1,13 +1,7 @@
-"""ComfyUI event to job lifecycle to database write plus WebSocket push.
+"""Reconcile against ComfyUI's queue and history because terminal events can be lost.
 
-Dispatch uses a table instead of an if/elif chain, so a new protocol event is one more row in the table.
-
-Events are an optimisation, not the source of truth. A job can leave the ComfyUI queue without the
-matching event ever arriving: a cancel that lands while a model is loading, an engine that restarts
-mid-load, a dropped frame. refresh_positions() therefore compares the ComfyUI queue against the jobs in
-flight and drives the difference to a terminal state, so no job depends on an event that may never
-come. Every terminal transition goes through _claim, which hands the job to exactly one caller, so
-an event and a reconcile pass racing on the same job can never both write a history row.
+Every terminal transition uses _claim so racing events and reconciliation cannot
+both write a history row.
 """
 
 import asyncio
@@ -37,14 +31,8 @@ class JobEvents:
         self.queue = queue
         self._pass = asyncio.Lock()
 
-    # --- terminal states ---
-
     def _claim(self, pid: str) -> Job | None:
-        """Take the job out of the registry, or None when someone else already took it.
-
-        This is the single point where a job stops being in flight, so whoever gets it here is
-        the only one that writes its history row and sends its terminal message.
-        """
+        """Grant one caller ownership of the history write and terminal message."""
         job = self.ctx.registry.remove(pid)
         if job is not None:
             self.ctx.eta.forget(pid)
@@ -53,8 +41,7 @@ class JobEvents:
     async def succeed(self, pid: str, hist: dict | None = None) -> None:
         if self.ctx.registry.get(pid) is None:
             return
-        # Read the history before claiming: a failure here leaves the job in flight, where the next
-        # reconcile pass tries again, instead of dropping it with no record at all.
+        # Read before claiming so a failed fetch leaves the job available for retry.
         if hist is None:
             hist = await self.ctx.comfy.get_history(pid)
         job = self.ctx.registry.get(pid)
@@ -97,14 +84,8 @@ class JobEvents:
         )
         await self.refresh_positions()
 
-    # --- reconcile ---
-
     async def refresh_positions(self) -> None:
-        """One reconcile pass, at most one at a time.
-
-        A terminal transition inside a pass calls back in here to refresh the positions of the
-        jobs behind it; the lock turns that into a no-op instead of a nested queue read.
-        """
+        """Skip overlapping passes, including callbacks from terminal transitions."""
         if self._pass.locked():
             return
         async with self._pass:
@@ -119,8 +100,7 @@ class JobEvents:
             if job.prompt_id in present:
                 job.missing_since = None
                 continue
-            # A job we asked to stop, and that ComfyUI no longer lists, has stopped. Nothing else
-            # can happen to it, so it needs no grace period.
+            # Requested cancellation plus queue absence needs no grace period.
             if job.cancelling:
                 await self.cancelled(job.prompt_id)
                 continue
@@ -132,13 +112,7 @@ class JobEvents:
             await self._retire(job)
 
     async def _retire(self, job: Job) -> None:
-        """A job ComfyUI has not listed for a whole reconcile interval and never reported on.
-
-        ComfyUI keeps a history record for everything it ran, failures included, so that record
-        decides whether the job finished, failed, or disappeared. A failed run carries the terminal
-        event it sent in the status messages; replaying it reports the failure exactly as the
-        event would have.
-        """
+        """Use history to settle a missing job, replaying recorded failure events."""
         pid = job.prompt_id
         hist = await self.ctx.comfy.get_history(pid)
         if not hist:
@@ -157,10 +131,8 @@ class JobEvents:
                 return
         await self.fail(pid, "execution_failed", "ComfyUI history shows no success")
 
-    # --- event entry point ---
-
     async def handle(self, kind: str, data: object) -> None:
-        """Every ComfyUI event enters here. A handler that raises must not end the listener."""
+        """A failed handler must not end the ComfyUI listener."""
         try:
             await self._handle(kind, data)
         except Exception:
@@ -196,8 +168,6 @@ class JobEvents:
             logger.info("ComfyUI connected")
             await self.ctx.hub.send_to_all(ws_schemas.SystemMessage(comfy_online=True))
         await self.refresh_positions()
-
-    # --- one handler per event ---
 
     async def _on_start(self, job: Job, data: dict) -> None:
         self.ctx.eta.start(job.prompt_id)

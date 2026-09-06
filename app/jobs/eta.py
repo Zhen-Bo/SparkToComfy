@@ -1,7 +1,4 @@
-"""Estimate the time left in the queue.
-
-Each size class keeps its 5 most recent measured durations, and upscaling adds a separate surcharge on top.
-"""
+"""Learn base duration per workflow/size class, excluding the upscale surcharge."""
 
 import time
 from collections import deque

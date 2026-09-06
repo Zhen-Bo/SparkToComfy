@@ -1,8 +1,4 @@
-"""Async and fake-server checks: WebSocket handshake, offline, ASGI, slow consumers.
-
-Every test takes its own Runtime (the `rt` fixture in conftest), so nothing global needs clearing and execution order does not matter.
-Every wait is event driven; none of them sleep on a fixed poll interval.
-"""
+"""Realtime checks use isolated Runtimes and event-driven waits, not polling delays."""
 
 import asyncio
 import json
@@ -57,10 +53,7 @@ def make_job(prompt_id, session_id, ip, params):
 
 
 class RecordingConn:
-    """Fake WebSocket connection that only records the JSON sent to it.
-
-    When gated, nothing goes out until the gate opens.
-    """
+    """Gate sends to simulate a stalled peer without timing-dependent sleeps."""
 
     def __init__(self, gated=False):
         self.received = []
@@ -75,7 +68,6 @@ class RecordingConn:
         self.arrived.set()
 
     async def wait_for(self, count, timeout=10, what="messages"):
-        """Wait until count messages arrive. Wakes on arrival, never polls on an interval."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while len(self.received) < count:
@@ -100,7 +92,6 @@ async def fake_comfy(port):
 
 @asynccontextmanager
 async def comfy_link(rt):
-    """Run an in-process fake ComfyUI WebSocket server, point the runtime at it and listen."""
     server = await fake_comfy(0)
     port = server.sockets[0].getsockname()[1]
     stub = comfy_client.ComfyClient(f"http://127.0.0.1:{port}")
@@ -120,7 +111,7 @@ async def comfy_link(rt):
 
 @asynccontextmanager
 async def watching(rt, session_id):
-    """Attach a connection used only to watch broadcasts, so online and offline waits never poll a flag."""
+    """Observe broadcasts rather than poll connection state."""
     conn = RecordingConn()
     rt.hub.add_connection(session_id, conn)
     try:
@@ -131,7 +122,7 @@ async def watching(rt, session_id):
 
 @pytest_asyncio.fixture
 async def comfy_online(rt):
-    """Flip the online flag through the real path, then tear down, leaving an environment that never hits the queue in the background."""
+    """Initialize via a real handshake, then stop the listener to avoid background reads."""
     async with watching(rt, "comfy-online-watch") as watcher:
         async with comfy_link(rt):
             await watcher.wait_for(1, what="online broadcasts")
@@ -301,7 +292,6 @@ RECEIPT_IP = "127.0.0.31"
 
 
 async def test_generate_answers_with_the_receipt_id(rt, comfy_online, example_values):
-    """The HTTP answer and the receipt frame must name the same job."""
     conn = RecordingConn()
     rt.hub.add_connection(RECEIPT_SESSION, conn)
     body = GenerateRequest.model_validate(
@@ -638,7 +628,6 @@ PING_C = "ping-slow"
 
 
 async def test_heartbeat_reaches_every_connection(rt):
-    """The beat is what a browser watches; every live connection has to feel it."""
     a, b = RecordingConn(), RecordingConn()
     rt.hub.add_connection(PING_A, a)
     rt.hub.add_connection(PING_B, b)
@@ -657,7 +646,7 @@ async def test_heartbeat_reaches_every_connection(rt):
 
 
 async def test_ping_never_counts_against_the_backlog(rt):
-    """A connection nobody reads gets a ping every 25 s; it must never be what closes it."""
+    """Heartbeat traffic alone must not evict an idle peer."""
     slow = RecordingConn(gated=True)
     rt.hub.add_connection(PING_C, slow)
     try:
@@ -695,10 +684,7 @@ async def _queue_says(rt, queue, history=None):
 
 
 async def test_cancelled_job_dropped_by_comfyui_is_settled(rt, comfy_online):
-    """Cancel lands before the job runs and ComfyUI deletes it silently.
-
-    No execution_interrupted ever arrives, so only the queue can say what happened.
-    """
+    """Queued cancellation emits no execution_interrupted event; use queue absence."""
     conn = RecordingConn()
     rt.hub.add_connection(LOST_SESSION, conn)
     pid = "lost-cancel-" + uuid.uuid4().hex
@@ -717,7 +703,6 @@ async def test_cancelled_job_dropped_by_comfyui_is_settled(rt, comfy_online):
 
 
 async def test_vanished_job_is_retired_after_the_grace_period(rt, comfy_online):
-    """A job with no history record and no event. It is retired once it stays unlisted for a whole interval."""
     conn = RecordingConn()
     rt.hub.add_connection(LOST_SESSION, conn)
     pid = "vanished-" + uuid.uuid4().hex
@@ -748,7 +733,6 @@ async def test_vanished_job_is_retired_after_the_grace_period(rt, comfy_online):
 
 
 async def test_job_that_finished_unheard_is_settled_from_history(rt, comfy_online):
-    """It left the queue because it finished. The history record is the proof, so it counts as done."""
     conn = RecordingConn()
     rt.hub.add_connection(LOST_SESSION, conn)
     pid = "silent-done-" + uuid.uuid4().hex
@@ -809,7 +793,6 @@ async def test_job_that_failed_unheard_is_settled_as_failed(rt, comfy_online):
 
 
 async def test_live_job_keeps_its_slot_and_is_never_retired(rt, comfy_online):
-    """The pass must only act on what is really gone, however often it runs."""
     pid = "alive-" + uuid.uuid4().hex
     _in_flight(rt, pid)
     queue = {"queue_running": [[0, pid]], "queue_pending": []}

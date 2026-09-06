@@ -11,9 +11,7 @@ import { PhImage, PhX } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
 
-// The picker lives in LoraPickerDialog, shared with the /playground overview.
 const open = ref(false)
-// the add-LoRA button: where focus lands after a card is removed, and aria-disabled when full (see the template note)
 const addBtn = ref(null)
 
 const ctl = computed(() => controls.value.lora)
@@ -26,20 +24,17 @@ function setStrength(lora, v) {
   lora.strength = v[0]
 }
 
-/* The full hover preview follows the cursor.
-   It is teleported to body and positioned fixed, because the panel is an overflow-y-auto scroll area that would clip an absolute overlay inside the component.
-   It sits to the right of the cursor, flipping left when there is no room, and is clamped vertically to the window.
-   Its size follows the real cover aspect ratio: the natural ratio is measured once the image loads and the overlay is repositioned, estimated at the maximum box until then. */
+/* Teleport the preview outside the scrolling panel to avoid clipping.
+   Reserve the maximum box until the cover loads, then reposition using its measured ratio. */
 const PREVIEW_MAX_W = 320
 const PREVIEW_MAX_H = 340
 const PAD = 12 // total padding of the overlay, from p-1.5
 const CURSOR_GAP = 14
 const preview = ref(null) // { file, left, top, w, h }
 const coverDims = ref({}) // file to { w, h }, filled in once img onload measures it
-const failed = ref(new Set()) // file names whose cover 404s; the backend always answers not_found
+const failed = ref(new Set()) // covers that failed to load
 
-/* The overlay waits half a second, so it does not flash when the cursor merely passes over a card.
-   Cursor movement during the wait updates where it will appear. */
+// Delay the preview so passing over a card does not flash an overlay.
 const SHOW_DELAY = 500
 let showTimer = 0
 
@@ -68,8 +63,7 @@ function showPreview(e, lora) {
     if (lastMove) placePreview(lastMove, lora.file)
   }, SHOW_DELAY)
 }
-/* mousemove fires faster than the screen updates, so this computes at most once per frame and keeps only the last coordinates; the frames in between are never drawn.
-   Coordinates are recorded even before the overlay appears, so the delay places it at the newest position. */
+// Coalesce mouse moves per frame and retain the latest position during the opening delay.
 let moveRAF = 0
 let lastMove = null
 function movePreview(e) {
@@ -95,8 +89,6 @@ function hidePreview() {
   preview.value = null
 }
 
-/* Long-press on the row: on the name it copies the name, anywhere else the cover floats above the finger.
-   The row opts out of scrolling and the callout (see .lora-row), or the browser takes the gesture over halfway. */
 const FINGER_GAP = 24 // the overlay floats this far above the finger, or the finger would cover it
 let pressTimer = 0
 let previewTouch = false
@@ -190,15 +182,13 @@ function repositionLoadedPreview(file) {
   placePreview(lastMove, file, previewTouch)
 }
 
-/** Once the cover loads, measure its real ratio so the overlay hugs the image shape with no margins, and reposition once at the final size. */
 function onCoverLoad(e, file) {
   const { naturalWidth: nw, naturalHeight: nh } = e.target
   if (!nw || !nh) return
   coverDims.value = { ...coverDims.value, [file]: fittedCoverSize(nw, nh) }
   repositionLoadedPreview(file)
 }
-/* Being full does not use the native disabled attribute.
-   When confirming the last allowed LoRA closes the dialog, radix returns focus to this button, and native disabled would drop that focus onto body, the same evaporation problem as GenerateButton. aria-disabled plus this early return is enough. */
+// Keep the add button focusable at capacity; aria-disabled requires this click guard.
 function openPicker() {
   if (picked.value.length >= LORA_MAX) return
   open.value = true
@@ -206,10 +196,10 @@ function openPicker() {
 function remove(lora) {
   hidePreview() // mouseleave never fires once the card is gone, so close the overlay here
   catalog.params.lora = picked.value.filter((x) => x.file !== lora.file)
-  // The remove button disappears with its card and keyboard focus would drop to body, so hand it to the add button, which is always there.
+  // The focused remove button disappears with its card; move focus to the persistent add button.
   nextTick(() => addBtn.value?.focus())
 }
-onBeforeUnmount(hidePreview) // same reason when switching tabs tears the component down
+onBeforeUnmount(hidePreview)
 </script>
 
 <template>
@@ -220,12 +210,7 @@ onBeforeUnmount(hidePreview) // same reason when switching tabs tears the compon
         :key="lora.file"
         class="rounded-md border border-control obs-inset px-3 pb-3 pt-2.5"
       >
-        <!-- Top row: the name on the left, with no description for a single name, the strength readout in amber on the right, and the remove button in the row.
-             The remove button stays in the document flow, because hiding it would leave unexplained space.
-             It is not absolutely positioned over the strength readout and it does not intercept this row's preview hover: an invisible button still takes pointer events and would kill hover across the top half.
-             A cursor resting on the remove button means the intent is deletion, so the cover preview is suppressed there, closed on mouseenter and reopened on mouseleave.
-             The row is items-center, so the text shares a centre line with the 24px button.
-             The hover preview is bound to this row only, so moving down to the slider does not trigger it and adjusting strength is never covered by the overlay. -->
+        <!-- Limit preview gestures to the header so the overlay does not cover strength adjustments. -->
         <div
           class="lora-row -mx-3 -mt-2.5 flex select-none items-center justify-between gap-3 px-3 pt-2.5"
           @mouseenter="showPreview($event, lora)"
@@ -280,7 +265,6 @@ onBeforeUnmount(hidePreview) // same reason when switching tabs tears the compon
 
     <LoraPickerDialog v-model:open="open" />
 
-    <!-- Full hover preview: fixed and following the cursor, taking no layout space, with the box at the real cover ratio and no margins -->
     <Teleport to="body">
       <div
         v-if="preview"
@@ -299,7 +283,6 @@ onBeforeUnmount(hidePreview) // same reason when switching tabs tears the compon
             @load="onCoverLoad($event, preview.file)"
             @error="onCoverError(preview.file)"
           />
-          <!-- Placeholder for a 404 cover, so the browser never draws a broken-image icon -->
           <PhImage v-else class="h-10 w-10 text-ink-faint" aria-hidden="true" />
         </div>
       </div>

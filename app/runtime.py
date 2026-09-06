@@ -1,7 +1,4 @@
-"""Sole owner of process state.
-
-lifespan builds one Runtime, routes reach it through app.deps.RuntimeDep, and every test builds its own.
-"""
+"""Lifespan owns one Runtime; tests build isolated instances."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,7 +24,6 @@ class Runtime:
     events: JobEvents
     jobs: JobsService
 
-    # Shortcuts to the parts routes read most, so they need not spell out rt.ctx.xxx.
     @property
     def db(self) -> Database:
         return self.ctx.db
@@ -63,7 +59,7 @@ async def build(
     comfy: ComfyClient | None = None,
     registry: Path = REGISTRY,
 ) -> Runtime:
-    """Build every part and wire it together. Database migration completes before return."""
+    """Database migration completes before the Runtime is returned."""
     db = Database(default_db_path() if db_path is None else db_path)
     await db.migrate()
     ctx = JobContext(

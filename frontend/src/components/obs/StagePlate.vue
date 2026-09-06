@@ -8,13 +8,11 @@ import { PhX } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
 
-// MobileStudioView passes compact for the phone stage
 const props = defineProps({ compact: { type: Boolean, default: false } })
 
 const stars = ref('')
 
 const stage = ref(null)
-/** Space available to the stage, the content box, tracked by a ResizeObserver. */
 const avail = ref({ w: 0, h: 0 })
 let ro = null
 
@@ -24,7 +22,6 @@ onMounted(() => {
   const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
   let s = ''
   for (let i = 0; i < 90; i++) {
-    // fill=currentColor takes the star colour from text-foreground on the host svg rather than a hardcoded hex, so it follows the theme
     s += `<circle cx="${(rnd() * 100).toFixed(1)}" cy="${(rnd() * 100).toFixed(1)}" r="${(0.05 + rnd() * 0.09).toFixed(2)}" fill="currentColor" opacity="${(0.15 + rnd() * 0.5).toFixed(2)}"/>`
   }
   stars.value = s
@@ -34,10 +31,8 @@ onMounted(() => {
   })
   ro.observe(stage.value)
 })
-/* The frame size transition is attached only when the size selection changes, which is the only time it means anything.
-   A window resize fires the ResizeObserver repeatedly without changing the selection, and it should not go liquid on every frame.
-   The first mounted frame is not animated either, or the frame would grow out of 0x0.
-   The class is removed after 350ms: the 300ms animation plus a margin. */
+/* Animate dimension changes without animating every window resize or the initial 0x0 measurement.
+   Remove the class after the 300ms transition plus a 50ms margin. */
 const animateShape = ref(false)
 let shapeTimer = 0
 watch(
@@ -53,7 +48,7 @@ onUnmounted(() => {
   clearTimeout(shapeTimer)
 })
 
-/** The stage frame keeps the image aspect ratio, with the long side as long as the available space allows. */
+// Fit inside the available space while preserving the image ratio.
 const frameStyle = computed(() => {
   const { width, height } = currentDims.value
   const { w, h } = avail.value
@@ -65,16 +60,12 @@ const frameStyle = computed(() => {
 const progressPct = computed(() =>
   run.progress ? Math.round((run.progress.step / run.progress.total) * 100) : 0,
 )
-// The step count is padded to the width of the total, so 9 to 10 does not shift columns, the readout keeps one width and the progress line beside it is never pushed.
+// Reserve the total's digit width to avoid shifts as the step count grows.
 const stepDigits = computed(() => String(run.progress?.total ?? 0).length)
 
-/* The stage phase follows run.phase directly.
-   Upscaling and transfer share one scan line: the node survives both phases, so only the text changes and the animation instance never restarts.
-   It stops the moment the wait ends, without waiting for a cycle boundary. */
 const SCAN = new Set(['upscaling', 'transfer'])
 
 const scanning = computed(() => SCAN.has(run.phase))
-/* The condition for the upscale badge is its own boolean, so the template never compares localized strings. */
 const upscaling = computed(() => run.phase !== 'transfer' && Number(catalog.params.upscale) > 1)
 const scanLabel = computed(() =>
   run.phase === 'transfer'
@@ -85,16 +76,11 @@ const scanLabel = computed(() =>
 )
 const upscaleLabel = computed(() => `×${Number(catalog.params.upscale ?? 1).toFixed(1)}`)
 
-/** The output wins, the preview comes second.
- * During upscaling and transfer the output is not there yet, so the stage naturally holds the last preview. */
 const finalOn = computed(() => Boolean(run.currentImage))
 const previewOn = computed(() => Boolean(run.previewFrame) && !finalOn.value)
 
 const queueOn = computed(() => run.phase === 'queued' || run.phase === 'preparing')
 
-/* The outcome bar.
-   A failure or a cancellation leaving no trace was the worst hole in this product, because a toast is gone in 2.2 seconds.
-   It takes the same slot as the progress bar, with the same geometry and type role, and only appears while nothing is running, so the three bars never share the screen. */
 const outcome = computed(() => (run.busy ? null : run.lastOutcome))
 const outcomeText = computed(() =>
   outcome.value?.kind === 'error'
@@ -102,7 +88,7 @@ const outcomeText = computed(() =>
     : t('stage.cancelled'),
 )
 
-/* Arrival, once the image is up, must not be silent for a screen reader: it announces completion once and clears when the next run enters the queue. */
+// Clear the live region between runs so repeated completions can be announced.
 const doneNote = ref('')
 watch(
   () => run.phase,
@@ -117,18 +103,14 @@ watch(
 <template>
   <main class="relative flex min-h-0 flex-col overflow-hidden bg-dome">
     <svg class="pointer-events-none absolute inset-0 h-full w-full text-foreground" :style="{ opacity: 'var(--stars-opacity)' }" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" v-html="stars" />
-    <!-- Dome glow -->
     <div class="pointer-events-none absolute inset-0" style="background: radial-gradient(1000px 640px at 50% 42%, hsl(var(--glow) / .06) 0%, transparent 70%)" />
 
-    <!-- Stage: the preview fills the space between the left and right columns -->
     <div ref="stage" class="relative z-10 flex min-h-0 w-full flex-1 items-center justify-center" :class="props.compact ? 'p-4' : 'p-8'">
-    <!-- Viewfinder; the size animation is attached only on a size change, see animateShape -->
     <div
       class="obs-corners relative"
       :class="animateShape && 'transition-[width,height] duration-300 ease-out'"
       :style="frameStyle"
     >
-      <!-- Two-layer body: the outer frame plus the inner preview area -->
       <div
         class="absolute inset-0 rounded-[3px] border border-hairline p-[6px]"
         style="background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 88%, black)); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05)"
@@ -150,19 +132,17 @@ watch(
           />
           <div class="sr-only" role="status">{{ doneNote }}</div>
 
-          <!-- Queue overlay: during the preparing phase the stage is empty, and a real queue shows the slots -->
           <div v-if="queueOn" class="qs-ovl absolute inset-0 z-10 flex items-center justify-center">
             <QueueSlots :ahead="run.queueAhead ?? 0" :ready="run.phase === 'preparing'" :eta="queueEta" />
           </div>
 
-          <!-- Scan line across upscaling and transfer: one node, only the text changes, the animation never restarts -->
+          <!-- Share this node across upscaling and transfer so the animation does not restart. -->
           <div v-if="scanning" class="upscan" aria-hidden="true">
             <i class="upscan-line" />
           </div>
         </div>
       </div>
 
-      <!-- Crosshair: shown only while the stage is empty, and it gives way to any image, preview frame or output -->
       <div v-if="!finalOn && !previewOn" class="pointer-events-none absolute inset-0 z-10" aria-hidden="true">
         <div class="absolute -bottom-3.5 -top-3.5 left-1/2 w-px" style="background: linear-gradient(to bottom, transparent, hsl(var(--amber) / .35) 30%, hsl(var(--amber) / .35) 70%, transparent)" />
         <div class="absolute -left-3.5 -right-3.5 top-1/2 h-px" style="background: linear-gradient(to right, transparent, hsl(var(--amber) / .35) 30%, hsl(var(--amber) / .35) 70%, transparent)" />
@@ -170,7 +150,6 @@ watch(
     </div>
     </div>
 
-    <!-- Progress bar, absolutely positioned against the bottom edge of the stage, so it takes no layout space and pushes neither the preview frame nor the columns -->
     <div
       v-if="run.busy && run.progress && !scanning"
       role="progressbar"
@@ -187,7 +166,6 @@ watch(
         {{ String(progressPct).padStart(3, '0') }}% ・ {{ t('stage.step', { step: String(run.progress.step).padStart(stepDigits, '0'), total: run.progress.total }) }}
       </div>
     </div>
-    <!-- Status bar for upscaling and transfer, at the bottom edge of the stage in the same position and format as the progress bar, reusing its vocabulary -->
     <div
       v-if="scanning"
       role="status"
@@ -197,8 +175,6 @@ watch(
       <span class="font-sans text-[11px] font-bold tracking-[.14em] text-amber-bright">{{ scanLabel }}</span>
       <span v-if="upscaling" class="font-mono text-[11px] font-bold text-amber-bright tabular-nums" translate="no">{{ upscaleLabel }}</span>
     </div>
-    <!-- Outcome bar: the on-screen evidence of a failure or a cancellation, kept until the next run starts or the user dismisses it.
-         Colour only assists; the text already says what happened, and a failure also gets the red top rule and the retry button. -->
     <div
       v-if="outcome"
       :role="outcome.kind === 'error' ? 'alert' : 'status'"
@@ -230,13 +206,10 @@ watch(
 </template>
 
 <style scoped>
-/* The queue overlay fades in, animating opacity only */
 .qs-ovl { animation: qsOvlIn .25s var(--ease-fluid) both; }
 @keyframes qsOvlIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* The scan line sweeps back and forth over 2.4s and fades at each end.
-   It maps to nothing: it is not progress and not a percentage.
-   A full-width band draws a 2px line with a 16px trail as a gradient, translateX runs on the compositor, and 100% pushes the trail just past the right edge. */
+/* Indeterminate activity indicator; its position does not represent progress. */
 .upscan { position: absolute; inset: 0; z-index: 10; overflow: hidden; pointer-events: none; }
 .upscan-line { position: absolute; inset: 0;
   background: linear-gradient(to right, transparent 0, hsl(var(--amber-bright) / .14) 16px, hsl(var(--amber-bright)) 16px, hsl(var(--amber-bright)) 18px, transparent 18px) no-repeat;
@@ -249,11 +222,9 @@ watch(
   100% { transform: translateX(100%); opacity: 0; }
 }
 
-/* The status bar rises in on the shared entry timing */
 .upsbar { animation: upsBarIn .3s var(--ease-fluid) both; }
 @keyframes upsBarIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-/* The output image appears with a slight scale: .97 follows the zoom-in vocabulary and never starts at scale(0), and .26s stays inside the 300ms motion budget. */
 .art-enter { animation: artIn .26s var(--ease-fluid) both; }
 @keyframes artIn {
   from { opacity: 0; transform: scale(.97); }

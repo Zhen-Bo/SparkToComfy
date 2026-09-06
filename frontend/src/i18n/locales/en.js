@@ -193,7 +193,7 @@ export default {
     copyUnsupported: 'Copy failed ─ clipboard images not supported by this browser',
     copyDenied: 'Copy failed ─ clipboard write denied',
   },
-  // Backend error codes (formerly ERROR_TEXT in stores/studio.js); unknown codes render raw
+  // Keys match backend error codes; stores/notify.js displays unknown codes verbatim.
   errors: {
     bad_request: 'Invalid parameters',
     not_found: 'Not found',

@@ -384,7 +384,6 @@ def test_openapi_declares_the_mount_prefix(openapi):
 
 
 async def test_docs_live_under_the_api_mount(client):
-    """Docs follow the API under /v1."""
     for path in ("/v1/openapi.json", "/v1/docs", "/v1/redoc"):
         resp = await client.get(path)
         assert resp.status_code == 200, (path, resp.status_code)
@@ -398,7 +397,6 @@ async def test_history_reports_its_limit(client):
 
 
 async def test_spa_serves_the_root_but_never_v1(client):
-    """The mount itself isolates /v1; no reserved-prefix list is involved."""
     unknown = await client.get("/v1/definitely-not-a-route")
     assert unknown.status_code == 404, unknown.status_code
     assert unknown.headers["content-type"].startswith("application/json"), (

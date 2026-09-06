@@ -38,7 +38,6 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // observatory palette — direct tokens
         dome: 'hsl(var(--dome))',
         plate: 'hsl(var(--plate))',
         elevated: 'hsl(var(--elevated))',
@@ -77,8 +76,7 @@ export default {
           from: { opacity: '0', transform: 'scale(.97)' },
           to: { opacity: '1', transform: 'scale(1)' },
         },
-        /* Exit is faster than entry.
-           It touches opacity only, never transform, so it cannot override the -translate-x/y-1/2 centering utility on DialogContent. */
+        /* Opacity-only exit preserves DialogContent's centring transform. */
         'fade-out': {
           from: { opacity: '1' },
           to: { opacity: '0' },

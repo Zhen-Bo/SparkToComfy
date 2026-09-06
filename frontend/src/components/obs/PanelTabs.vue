@@ -1,8 +1,4 @@
 <script setup>
-/**
- * The basic/advanced tab strip.
- * The workspace parameter panel and the /playground overview share this one implementation, so a change here reaches both.
-*/
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { cn } from '@/lib/utils'
@@ -13,8 +9,7 @@ const props = defineProps({
   modelValue: { type: String, required: true },
   // aria id prefix: id and aria-controls must match the host panel tabpanel id
   idBase: { type: String, default: 'panel' },
-  // Ids of edited tabs.
-  // A hidden tab can only show its dirty mark through this. /playground passes nothing, so it defaults to empty.
+  // Tab IDs whose hidden controls have edits to surface on the strip.
   dirty: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:modelValue'])
@@ -24,7 +19,6 @@ const tabs = [
   { id: 'tuning', key: 'tabs.tuning' },
 ]
 
-/** Arrow-key navigation for the tablist (WAI): left/right moves focus and selects. */
 const tabRefs = ref([])
 function onTabKeydown(e, i) {
   if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return

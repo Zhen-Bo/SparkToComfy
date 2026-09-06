@@ -1,18 +1,7 @@
-/**
- * Zoom and pan for the image viewer: wheel, drag, two-finger pinch, and a floor that is recomputed after a window resize.
- * All the geometry lives here; the caller only draws and routes the keyboard.
- *
- * Opening or switching images fits the image (scale = minScale), the ceiling is 400% and the zoom factor is never displayed.
- * Zoom steps geometrically, x1.12 and /1.12, and the wheel anchors on the cursor, the way browsers and Figma do it.
- * The viewing margin is 16px on all four sides, because the dock floats and takes no layout space.
- * Below 960px the side margins tighten to 8px and the stage reserves the top chrome and the bottom thumbnail panel.
- * Panning stops where the image edge meets the stage edge, so the image is always on screen and can never be lost.
-*/
-
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 export const MAX_SCALE = 4
-export const ZOOM_FACTOR = 1.12 // geometric steps, so every notch feels the same, the standard for image viewers
+export const ZOOM_FACTOR = 1.12
 export const PAN_STEP = 40 // pan step in px for Shift plus an arrow key
 const EDGE = 16 // minimum distance between the image frame and each window edge
 const NARROW = 960 // below this the layout is the phone one (MobileStudioView takes over at the same line)
@@ -24,7 +13,7 @@ export function useZoomPan(dims) {
   const ox = ref(0)
   const oy = ref(0)
   const dragging = ref(false)
-  const pinching = ref(false) // a two-finger pinch is in progress: no transform transition, grabbing cursor
+  const pinching = ref(false)
   const winW = ref(window.innerWidth)
   const winH = ref(window.innerHeight)
   let dragFrom = null
@@ -40,21 +29,18 @@ export function useZoomPan(dims) {
   const stageH = computed(() => winH.value - insets.value.top - insets.value.bottom)
   const centerY = computed(() => (winH.value + insets.value.top - insets.value.bottom) / 2)
 
-  /** The long side wins: landscape images lock width, portrait and square lock height. */
   const frame = computed(() => {
     const a = dims.value.width / dims.value.height
     return isLandscape.value ? { w: stageW.value, h: stageW.value / a } : { w: stageH.value * a, h: stageH.value }
   })
   const frameStyle = computed(() => ({ width: `${frame.value.w}px`, height: `${frame.value.h}px` }))
 
-  /** The zoom floor is whatever fits the stage; it drops below 1 for a landscape image that would bleed at 100%.
-   * Two decimals keep the readout steady, and the rounding goes down: rounding to nearest can land above the true fit and push the image past the margin. */
+  // Round the fit down; rounding up could push the image past the available space.
   const minScale = computed(() => Math.min(1, Math.floor(Math.min(stageW.value / frame.value.w, stageH.value / frame.value.h) * 100) / 100))
 
   const transform = computed(() => `translate(${ox.value}px, ${oy.value}px) scale(${scale.value})`)
 
-  /* While a gesture runs, dragging or pinching, the image transforms every frame and a full-screen backdrop-filter would resample and reblur on each one.
-     The backdrop blur on the mask and the chrome is therefore disabled for the gesture, see .bd-off in style.css. */
+  // The caller disables backdrop blur while gesturing to avoid filtering every moving frame.
   const gesturing = computed(() => dragging.value || pinching.value)
 
   function fitToStage() {
@@ -63,8 +49,7 @@ export function useZoomPan(dims) {
     oy.value = 0
   }
 
-  /** The offset ceiling is whatever the scaled image hides outside the stage.
-   * Once an edge reaches the stage edge there is nothing further to reveal, so the pan stops; an image smaller than the stage has a ceiling of zero and stays centred. */
+  // Stop panning at image edges; dimensions smaller than the stage stay centred.
   function clampOffset() {
     const maxX = Math.max(0, (frame.value.w * scale.value - stageW.value) / 2)
     const maxY = Math.max(0, (frame.value.h * scale.value - stageH.value) / 2)
@@ -96,8 +81,6 @@ export function useZoomPan(dims) {
     zoom(e.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR, e.clientX, e.clientY)
   }
 
-  /** Pan with Shift plus an arrow key.
-   * It only means anything once zoomed in, and the caller decides, because only it knows whether Shift is held. */
   function panBy(dx, dy) {
     ox.value += dx
     oy.value += dy
@@ -109,7 +92,6 @@ export function useZoomPan(dims) {
     e.currentTarget.setPointerCapture(e.pointerId)
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.size === 2) {
-      // A second finger starts a pinch: record the starting distance, scale, offset and midpoint, and cancel the one-finger drag.
       const [a, b] = [...pointers.values()]
       dragging.value = false
       dragFrom = null
@@ -175,7 +157,7 @@ export function useZoomPan(dims) {
   }
 
   function onResize() {
-    // An image sitting at the fit was never zoomed by hand, so a new window size re-takes the fit rather than keeping a scale that no longer fills the stage.
+    // Preserve fit mode on resize while retaining a manually zoomed scale when possible.
     const wasFitted = Math.abs(scale.value - minScale.value) < 1e-3
     winW.value = window.innerWidth
     winH.value = window.innerHeight

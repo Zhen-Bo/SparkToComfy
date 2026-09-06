@@ -1,5 +1,4 @@
 <script setup>
-/** The mobile parameter sheet: one grabber, two snap points (collapsed to the grabber, expanded over the stage). */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { run } from '@/stores/run'
@@ -23,7 +22,6 @@ let ro = null
 onMounted(() => {
   ro = new ResizeObserver(([entry]) => {
     sheetH.value = entry.contentRect.height
-    // resizes re-anchor the parked state
     ty.value = expanded.value ? 0 : maxTy.value
   })
   ro.observe(sheet.value)
@@ -37,7 +35,6 @@ let trail = [] // last few [time, clientY] samples for release velocity
 
 function onPointerDown(e) {
   if (e.button !== undefined && e.button !== 0) return
-  // capture on the button: the move/up handlers live here
   e.currentTarget.setPointerCapture(e.pointerId)
   /* A press mid-settle interrupts it: ty already holds the target, so the live position comes from the rendered rect, not the ref. */
   const parentBottom = sheet.value.offsetParent?.getBoundingClientRect().bottom
@@ -65,13 +62,12 @@ function onPointerUp(e) {
   if (!dragging.value) return
   dragging.value = false
   e.currentTarget.releasePointerCapture?.(e.pointerId)
-  // A tap on the grabber toggles the sheet.
   if (!moved) return snapTo(expanded.value ? maxTy.value : 0)
 
   const [t0, y0] = trail[0]
   const dt = Math.max(1, e.timeStamp - t0)
   const v = ((e.clientY - y0) / dt) * 1000 // px/s, positive = downward = closing
-  // flick projection (Apple's exponential decay, d = 0.998), then snap to the nearer boundary
+  // Project remaining travel with exponential decay (d = 0.998), then snap to the nearer boundary.
   const projected = ty.value + (v / 1000) * (0.998 / (1 - 0.998))
   snapTo(Math.abs(projected - 0) < Math.abs(projected - maxTy.value) ? 0 : maxTy.value)
 }
@@ -94,7 +90,6 @@ defineExpose({ el: sheet, expanded, collapse })
 </script>
 
 <template>
-  <!-- Reduced motion needs no branch: the global reduce rule strips transform transitions -->
   <section
     ref="sheet"
     :aria-label="t('panel.aria')"

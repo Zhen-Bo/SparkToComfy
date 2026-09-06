@@ -2,9 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import StudioView from '@/views/StudioView.vue'
 import { i18n } from '@/i18n'
 
-/**
- * Routes, history mode. / workspace: the three observatory columns /playground component overview: the real components from src/components, one source Any unknown path falls back to the workspace.
-*/
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
