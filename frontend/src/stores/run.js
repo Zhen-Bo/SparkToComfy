@@ -1,5 +1,3 @@
-/** The lifecycle of one generation: submit, stage phase, progress, preview, outcome. */
-
 import { computed, reactive, watch } from 'vue'
 import { cancelJob, fetchJob, preloadImage, submitGeneration } from '@/api/comfy'
 import { JOB_STATUS, JOB_STATUSES } from '@/api/ws-contract.generated'
@@ -10,25 +8,18 @@ import { errorText, notifyError } from '@/stores/notify'
 
 const { t } = i18n.global
 
-/** Phases where cancel means something.
- * Pressing it in any other phase does nothing. */
 const CANCELLABLE = ['preparing', 'queued', 'generating', 'upscaling']
 
 export const run = reactive({
-  /* Outcome of the last run: null, { kind: 'error', reason } or { kind: 'cancelled' }.
-     Failure and cancellation are the only two phases in this product that leave no evidence on screen.
-     A toast is gone in 2.2 seconds, and someone who stepped away cannot tell "it failed" from "I never pressed it".
-     This survives until the next run starts or the user dismisses it. */
+  // Keep failures and cancellations visible until dismissed or a new run starts.
   lastOutcome: null,
-  /* Snapshot of {workflowId, params} at submit time, so retry resends exactly that.
-     Resending the current panel values would make the word retry a lie once the user has edited a parameter after the failure. */
+  // Snapshot at submission so retry preserves the original parameters after panel edits.
   lastRun: null,
 
   promptId: null,
   currentImage: null, // output image URL, or null
   previewFrame: null, // data URL of the newest preview, or null; only the newest is kept
 
-  // Five stage phases: idle, queued/preparing, generating, upscaling, transfer, idle
   busy: false,
   phase: 'idle',
   queueAhead: null,
@@ -36,9 +27,7 @@ export const run = reactive({
   progress: null, // { step, total }
 })
 
-/* When the output dimensions change the viewfinder changes shape, the old image is at the wrong ratio, and the stage clears back to the crosshair.
-   The test is the dimensions themselves, not which control was touched.
-   It never clears while generating, so preview frames in flight survive. */
+// Clear stale images when the frame dimensions change, but preserve previews during a run.
 watch(
   () => `${currentDims.value.width}×${currentDims.value.height}`,
   () => {
@@ -48,9 +37,6 @@ watch(
   },
 )
 
-/* The single source of truth for "locked while generating".
-   Every entry that can change currentDims reads this one: the size buttons, the workflow picker and a history restore.
-   A second parallel busy flag would be a second truth that can drift. */
 export const locked = computed(() => run.busy)
 
 export const queueEta = computed(() => {
@@ -95,8 +81,6 @@ export function dismissOutcome() {
   run.lastOutcome = null
 }
 
-/** Resend with the original parameters of the failed run.
- * If the workflow no longer exists it says so and stops, the same all-or-nothing rule as a history restore. */
 export function retryLastRun() {
   const last = run.lastRun
   if (!last || run.busy) return
@@ -127,18 +111,16 @@ export async function cancelRun() {
   }
 }
 
-/* A seed locked at -1 gets the resolved value written back into the field after a successful run, the NovelAI convention.
-   Only while locked: an unlocked -1 means "random again next time", and writing it back would change what the user asked for.
-   Only the backend knows the resolved value, so it comes from params.seed, a string, on the matching history entry. */
+/* Resolve a locked random seed from backend history so it can be reused.
+   Leave an unlocked -1 unchanged to request a new random seed next time. */
 function writeBackSeed(entries) {
   if (!catalog.seedLocked || Number(catalog.params.seed) !== -1) return
   const realized = Number(entries.find((h) => h.promptId === run.promptId)?.params?.seed)
   if (Number.isInteger(realized) && realized >= 0) catalog.params.seed = realized
 }
 
-/* The transfer phase: the scan line keeps running until the output image has really loaded.
-   History and the image are written in the same update, so both reach the screen at the same moment rather than one after the other.
-   The backend writes history before it broadcasts done (succeed in app/jobs/events.py), so the entry is always there by now. allSettled keeps one failure from taking the other down, and means this never rejects, which matters because onJob does not await it. */
+/* Stay in transfer until the image load and history refresh settle.
+   allSettled lets either operation finish even if the other fails. */
 async function finish(images) {
   run.phase = 'transfer'
   const url = images[0]
@@ -146,7 +128,6 @@ async function finish(images) {
   if (img.status === 'fulfilled') run.currentImage = url
   else {
     console.error('[image] output image failed to load', img.reason)
-    // The stage falls back to an empty canvas, so this is another outcome with no visual evidence: it goes to the bottom bar rather than a toast.
     run.lastOutcome = { kind: 'error', reason: errorText(img.reason?.code) }
   }
   writeBackSeed(history.entries)

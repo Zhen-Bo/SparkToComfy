@@ -3,29 +3,15 @@
 @tailwind utilities;
 
 @layer base {
-  /*
-    Theme system: five colorways, with --amber as the instrument accent slot that every theme overrides.
-    The semantic layer (--background and the rest) is defined once and refers to the palette variables,
-    so switching a theme flips everything at once.
-  */
+  /* --amber is the accent slot in every theme, regardless of its actual hue. */
   :root {
-    /* Default theme, NIGHT AMBER: a neutral warm black ground where amber glows with no other colour competing.
-       Structural rules: surfaces step by 4 to 5 lightness points and the darks stay warm.
-       A structural line must be visible, at least 1.35:1 against the surface it encloses, without brightening into a grid,
-       so hairline stays at or below 1.6:1 against plate.
-       A control border is a different thing: WCAG 1.4.11 wants 3:1 and neither hairline nor edgeline reaches it,
-       hence the separate --control level at 3:1 or better against dome, plate, elevated and inset.
-       Dividers use hairline at full strength, roughly 1.7:1 against inset, rather than being weakened with alpha.
-       A divider as bright as the column frame makes every line in the room weigh the same.
-       A group divider is the point of the grouping and needs another half step; see the note on the group border in ParameterPanel. */
     --dome: 30 14% 5%;
     --plate: 30 12% 12%;
     --elevated: 28 11% 17%;
     --inset: 32 14% 8%;
     --hairline: 28 10% 22%;
     --edgeline: 27 10% 31%;
-    /* The control border level: the identifying edge of an input, dropdown, button or selectable row.
-       Structural lines still use hairline. */
+    /* Controls need stronger contrast than decorative hairline and edgeline dividers. */
     --control: 28 10% 47%;
     --amber: 34 78% 55%;
     --amber-bright: 38 88% 70%;
@@ -38,7 +24,6 @@
     --ease-fluid: cubic-bezier(.22, 1, .36, 1);
     --inset-shadow: inset 0 2px 7px rgba(0, 0, 0, .42), inset 0 1px 2px rgba(0, 0, 0, .5);
 
-    /* shadcn semantic mapping — resolved per theme */
     --background: var(--dome);
     --foreground: 36 20% 93%;
     --card: var(--plate);
@@ -82,18 +67,11 @@
   }
 
   [data-theme='daylight'] {
-    /* A warm paper ground with a vermilion instrument scale.
-       The accent carries the main action and the connected readout, so it has to clear AA at 4.5:1 over --dome,
-       which a blue cannot do at this lightness. */
+    /* The accent is also readout text; preserve its contrast against --dome. */
     --dome: 32 68% 95%; --plate: 30 100% 98%; --elevated: 0 0% 100%; --inset: 33 45% 91%;
     --hairline: 33 25% 81%; --edgeline: 33 17% 68%; --control: 34 10% 50%;
     --amber: 10 76% 43%; --amber-bright: 10 66% 36%; --amber-dim: 11 73% 80%;
-    /* The image well follows the paper ground here.
-       A dark surround judges an image more accurately,
-       but on a light theme it puts a block of black in a room that has none. */
     --plate-bg: 32 55% 92%; --ink-faint: 30 9% 42%; --glow: 10 76% 43%;
-    /* The viewer scrim dims the room rather than replacing it: the near-black of the dark themes would drop a hole into a paper world.
-       It still has to isolate the evidence, so it stays deep enough to hold 10:1 against a white image while the workspace behind falls back to 2:1. */
     --overlay: 32 30% 26%;
     --stars-opacity: 0;
     --inset-shadow: inset 0 1px 3px hsl(33 20% 20% / .09);
@@ -114,7 +92,7 @@
     @apply border-border;
   }
   :root {
-    color-scheme: dark; /* native scrollbars and form controls follow the dark themes */
+    color-scheme: dark;
   }
   [data-theme='daylight'] {
     color-scheme: light;
@@ -134,8 +112,6 @@
     /* The :active scale is the deliberate tap feedback, so the default grey tap highlight is turned off. */
     -webkit-tap-highlight-color: transparent;
   }
-  /* The /playground overview is a long page, so document scrolling is restored.
-     The workspace stays app-style with overflow:hidden and each column scrolls itself. */
   html[data-route='playground'] body {
     overflow: auto;
   }
@@ -155,7 +131,6 @@
 }
 
 @layer components {
-  /* The observatory frame mark. */
   .obs-corners { position: relative; }
   .obs-corners::before,
   .obs-corners::after {
@@ -179,29 +154,18 @@
     color: hsl(var(--foreground));
   }
   .obs-label::after {
-    /* The rule extending from the label is the group divider.
-       At 1px it breaks up and disappears on a real screen at this lightness step, on an uncalibrated display or in a narrow window,
-       so it buys presence with 2px of thickness.
-       The colour stops at edgeline: no new element and no amber. */
     content: ''; flex: 1; height: 2px; background: hsl(var(--edgeline));
-    /* The parent is items-baseline, so the rule would sit on the text baseline and read as too low.
-       A group divider should align with the visual centre of the text. */
+    /* Override the parent's baseline alignment to centre the divider against the label. */
     align-self: center;
   }
 
   .obs-hint {
-    /* The type floor is 11px.
-       At 10.5px it is hard work on an ordinary screen, neither calibrated nor high-DPI,
-       and this is a shared machine console read at a distance: a readout nobody can read is not a readout. */
     font-family: 'Chivo Mono', 'Taipei Sans TC', monospace;
     font-size: 11px; letter-spacing: .03em;
     color: hsl(var(--ink-faint));
     margin-top: 6px;
   }
 
-  /* The gradient stops at 3%.
-     Any deeper and the foot of the column sinks back into the ground colour.
-     The top highlight is how anodised metal reads. */
   .obs-panel {
     background: linear-gradient(180deg, hsl(var(--plate)), color-mix(in srgb, hsl(var(--plate)) 97%, black));
     box-shadow: inset 0 1px 0 hsl(0 0% 100% / .035);
@@ -210,19 +174,14 @@
     background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 97%, black));
     box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05);
   }
-  /* The translucent plate, used only by the viewer chrome: the key hints, the parameters and the navigation dock.
-     It covers the image as little as possible and the picture still shows faintly through.
-     Opacity is the only variable that can guarantee contrast over an arbitrary image.
-     92% is the floor that keeps muted-foreground at or above 4.5:1 on all five themes over both extremes, a white image and a black one; the tightest is amber over white at 4.99:1.
-     ink-faint stays below AA on this ground, so the viewer chrome never uses it. */
+  /* This surface overlays arbitrary images. Recheck text contrast before reducing opacity;
+     use muted-foreground rather than ink-faint for viewer text. */
   .obs-ghost {
     background: hsl(var(--elevated) / .92);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
-  /* While dragging or pinching, the image transforms every frame and backdrop-filter would resample and reblur on each one,
-     so it is turned off for the gesture.
-     The 92% ground carries readability on its own, and the blur returns on release. */
+  /* Disable backdrop blur during gestures to avoid filtering the moving image each frame. */
   .bd-off .obs-ghost {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -239,8 +198,6 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
-  /* One transition for every interactive element: colour, border and transform only.
-     transition: all is banned. */
   .obs-tr {
     transition:
       color .2s var(--ease-fluid),
@@ -250,12 +207,8 @@
       box-shadow .2s var(--ease-fluid);
   }
 
-  /* Reduced motion removes travel, not feedback.
-     Transitions keep their normal timing but are narrowed to the properties that do not move anything,
-     so hover, focus, selection and state colour still cross-fade while transform, width and position snap.
-     Keyframe animations run out at .01ms; every one of them uses fill-mode both, so the element lands on its final frame and the state change survives.
-     The two animations that carry state meaning, the queue slot blink and the upscale scan line,
-     are slowed fourfold rather than killed, so the change stays readable. */
+  /* Preserve colour feedback while removing movement transitions.
+     Queue and scan indicators retain a slower loop to communicate ongoing activity. */
   @media (prefers-reduced-motion: reduce) {
     *, ::before, ::after {
       transition-property: color, background-color, border-color, box-shadow, opacity, fill, stroke !important;
