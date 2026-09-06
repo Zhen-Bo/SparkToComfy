@@ -1,9 +1,4 @@
-"""Shared test environment and helpers.
-
-Every test gets its own Runtime (its own temp database, registry, hub and eta model), so nothing global needs clearing and any test can run on its own.
-
-The schema comes from the real alembic migration: it runs once per session into a template file and every test copies that file.
-"""
+"""Isolated Runtimes use copies of one database template built by real migrations."""
 
 import asyncio
 import json
@@ -16,8 +11,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
-# app.config builds its settings at import time and the shipped default keeps the API docs closed.
-# The docs tests assert where the docs live once open, so open them before the app package loads.
+# Enable docs before importing app.config, which constructs settings at import time.
 os.environ.setdefault("SERVER__DOCS", "true")
 
 from app import runtime
@@ -25,8 +19,7 @@ from app.database import Database
 from app.main import api, app
 from app.settings import ROOT
 
-# config/workflow.yaml is git-ignored, so it holds whatever workflows the machine happens to deploy.
-# The tests assert against the shipped example, which is the only registry every checkout has.
+# Do not depend on the machine's git-ignored deployment registry.
 EXAMPLE_REGISTRY = ROOT / "config" / "workflow.example.yaml"
 
 
@@ -37,8 +30,6 @@ def example_registry():
 
 # --- valid parameters ---
 
-# One valid set of values for the example workflow.
-# e2e reuses it with only the prompt and seed changed, so it is never written out a second time.
 EXAMPLE_VALUES = {
     "model": "krea2Turbo_v10_fp8.safetensors",
     "quality": "",
@@ -171,7 +162,6 @@ class AsgiWs:
                 return out
 
     async def wait_for_type(self, kind, timeout=10):
-        """Wait for a message of the given type. Event driven: it wakes on arrival, never polls."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while True:

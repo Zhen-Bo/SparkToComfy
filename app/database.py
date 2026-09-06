@@ -1,6 +1,6 @@
-"""Data access for the job table.
+"""Runtime owns the engine lifecycle; importing this module does not touch disk.
 
-lifespan builds the engine (see app/runtime.py), not import time, so importing app.database never touches the disk and tests need not care about import order. alembic/ owns the schema.
+alembic/ owns the schema.
 """
 
 import asyncio
@@ -17,8 +17,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.settings import ROOT
 
-# Max rows one history listing returns.
-# The frontend reads it from the X-History-Limit header on GET /v1/history instead of keeping its own copy.
+# Published as X-History-Limit so the frontend does not duplicate the cap.
 HISTORY_LIMIT = 50
 
 ALEMBIC_INI = ROOT / "alembic.ini"
@@ -89,8 +88,6 @@ class Database:
     async def aclose(self) -> None:
         await self.engine.dispose()
 
-    # --- writes ---
-
     async def insert_finished(
         self,
         job: JobSubmission,
@@ -99,7 +96,6 @@ class Database:
         images: list[dict] | None = None,
         error: str | None = None,
     ) -> None:
-        """One call for both done and failed, so the row shape is defined in one place."""
         async with self.session.begin() as session:
             session.add(
                 JobRow(
@@ -114,8 +110,6 @@ class Database:
                     finished_at=now(),
                 )
             )
-
-    # --- reads ---
 
     async def get_job(self, session_id: str, prompt_id: str) -> dict | None:
         """The finished record of one job of this session: status, image refs, error text."""
@@ -185,8 +179,6 @@ class Database:
             return None
         images = json.loads(raw)
         return images[index] if index < len(images) else None
-
-    # --- soft delete ---
 
     async def clear_history(self, session_id: str) -> None:
         async with self.session.begin() as session:

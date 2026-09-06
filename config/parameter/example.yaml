@@ -1,26 +1,20 @@
-# One workflow's parameter form: what the panel shows, and where each value lands in the graph.
-# This is the shipped example. Copy it, register the copy, and edit; nothing here is special-cased.
-#
-# Three files describe a workflow and refer to each other:
+# Copy and register this example to declare another workflow:
 #   config/workflow.yaml         the registry, which gives the workflow its id and points at the two files below
 #   config/parameter/<id>.yaml   this file
 #   config/workflow/<name>.json  the graph, exported from ComfyUI with "Export (API)"
 #
-# Two keys appear on almost every control:
-#   node     a key in the exported JSON. Open the file and read the ids; they are strings, so quote them.
-#   target   a key inside that node's own "inputs" object. It is a literal name, never a path: node 20744 really does have an input called "resize_type.scale".
+# Control bindings:
+#   node     a string key in the exported JSON; quote numeric-looking IDs.
+#   target   a literal key in the node's "inputs", not a path (e.g. "resize_type.scale").
 #
-# Editing this file needs no restart. The catalog reloads every 30 seconds, and a file that fails to load keeps the previous version and logs why.
+# Reloaded every 30 seconds; failed loads keep the previous catalog and log the error.
 #
-# Every model, LoRA, sampler and scheduler named below is a name the machine this example
-# was written on happens to have. Yours will differ, and a name ComfyUI does not know makes
-# it reject the whole prompt. Ask your own instance what it has:
+# Replace model/LoRA/sampler names with those installed on your ComfyUI instance:
 #   curl -s localhost:8188/object_info/UNETLoader           | jq '..|.unet_name?//empty|.[0]'
 #   curl -s localhost:8188/object_info/LoraLoaderModelOnly  | jq '..|.lora_name?//empty|.[0]'
 #   curl -s localhost:8188/object_info/KSampler             | jq '..|.sampler_name?//empty|.[0]'
 
-# Values written straight into the graph, with no control on screen.
-# Use this for anything the operator must not change.
+# Fixed graph inputs, not exposed to the operator.
 hidden:
     clip:
         node: "20735:6198"
@@ -43,12 +37,9 @@ hidden:
         target: filename_prefix
         value: API/%date:yyyy-MM-dd-hh-mm-ss%-%seed%-%model%
 
-# The two tabs of the panel. Every control here is submitted by the operator and validated
-# server-side; a name the form does not declare is rejected.
+# User controls are validated server-side; undeclared parameter names are rejected.
 basic:
-    # dropdown — a fixed list of choices.
-    # An option is either `key: Label` or a table, which is what lets one be greyed out.
-    # A disabled option is refused server-side too, not only hidden in the UI.
+    # Options accept `key: Label` or a table; disabled options are also rejected server-side.
     model:
         node: "20735:6196"
         target: unet_name
@@ -61,7 +52,7 @@ basic:
                 disabled: true
         default: krea2Turbo_v10_fp8.safetensors
 
-    # multiline — a text area. max_length is enforced on the server, so raising it here is what raises the real limit.
+    # max_length is enforced server-side, not just in the textarea.
     quality:
         node: "20739"
         target: positive
@@ -81,15 +72,13 @@ basic:
         max_length: 500
         default: ""
 
-    # size — the ratio picker. The presets come from config/size.yaml and are shared by every workflow, which is why none are listed here.
-    # It patches width and height together, so the node needs both inputs.
+    # Presets come from config/size.yaml; the node needs custom_width and custom_height inputs.
     size:
         node: "20755"
         type: size
 
 advanced:
-    # input — one number. value_kind is int or float and decides what the server accepts; min and max are enforced there as well.
-    # display and step only tell the frontend how to draw it.
+    # value_kind/min/max are enforced server-side; display/step are frontend hints.
     steps:
         node: "20742"
         target: steps
@@ -138,9 +127,8 @@ advanced:
             beta: Beta
         default: beta
 
-    # bypass — skip part of the graph when the control sits at a chosen value.
-    # At scale 1 there is nothing to upscale, so instead of running the upscaler on an unchanged image, node 20753's "anything" input is rewired to output slot 0 of node 20743 and the upscaler is left out of the run.
-    # Any control may carry a bypass block; it is not tied to the input type.
+    # At scale 1, bypass the upscaler by wiring its consumer to the original image.
+    # Any control type may declare a bypass block.
     upscale:
         node: "20744"
         target: resize_type.scale
@@ -160,11 +148,10 @@ advanced:
                     node: "20743"
                     slot: 0
 
-    # lora — the picker, up to five entries, each with its own strength.
-    # The options below are private merges belonging to the author of this example; swap in whatever your own instance reports.
-    # The node must be a Lora Loader (LoraManager) from ComfyUI-Lora-Manager: the panel writes the `<lora:name:strength>` syntax that node reads, and cover art comes from the same add-on's API.
-    # Drop this control and the workflow needs neither the node nor the add-on.
-    # Option keys are file names as Lora Manager reports them, without the .safetensors suffix.
+    # Requires ComfyUI-Lora-Manager's Lora Loader (LoraManager): the backend writes
+    # structured `loras` inputs and clears `text`; cover art uses the same add-on.
+    # Replace these example options with file names reported by your LoRA Manager,
+    # without the .safetensors suffix. Omit this control if the graph uses no LoRAs.
     lora:
         node: "20737"
         type: lora

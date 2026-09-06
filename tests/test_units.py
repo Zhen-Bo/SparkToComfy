@@ -51,8 +51,6 @@ def values():
 # --- controls ---
 
 
-# What the node inputs must look like after the `values` fixture is patched into the example workflow.
-# The whole map is compared at once, so a failure shows every difference instead of pointing at a single node id.
 EXAMPLE_PATCHED = {
     "20735:6196": {"unet_name": "krea2Turbo_v10_fp8.safetensors"},
     "20735:6198": {
@@ -94,7 +92,6 @@ EXAMPLE_PATCHED = {
 
 
 def inputs_like(graph: dict, expected: dict) -> dict:
-    """Narrow the graph down to the shape of expected so the two compare in one go."""
     return {
         node: {key: graph[node]["inputs"].get(key) for key in fields}
         for node, fields in expected.items()
@@ -224,7 +221,6 @@ def test_load_workflows_propagates_declaration_error(example_registry):
     with mock.patch.object(
         controls, "check_declaration", side_effect=RuntimeError("boom")
     ):
-        # load_workflows must propagate a failed declaration check
         with pytest.raises(RuntimeError):
             load_workflows(example_registry)
 
@@ -239,8 +235,6 @@ def test_declared_multiline_defaults_fit_max_length(workflows):
 
 
 def test_multiline_accepts_max_length_value(example, values):
-    # Read the cap from the declaration.
-    # Hardcoding it would stop this from testing the boundary as soon as max_length changes.
     limit = example["parameters"]["basic"]["positive"]["max_length"]
     edge = {**values, "positive": "x" * limit}
     assert (
@@ -270,7 +264,6 @@ def _fake_lora_manager(request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture
 def lora_manager_rt(rt):
-    """Swap the runtime comfy client for the fake LoRA Manager."""
     rt.ctx.comfy = comfy_client.ComfyClient(
         "http://lora-manager.test", transport=httpx.MockTransport(_fake_lora_manager)
     )
@@ -372,10 +365,6 @@ def test_eta_finish_records_sample(eta, eta_job):
 
 
 def test_ws_contract_is_fresh():
-    """Fails when the schema changed and the codegen was not rerun.
-
-    Fix with: uv run python scripts/gen_ws_contract.py
-    """
     from scripts.gen_ws_contract import OUT, render
 
     assert OUT.read_text(encoding="utf-8") == render(), (
@@ -384,7 +373,6 @@ def test_ws_contract_is_fresh():
 
 
 def test_ws_contract_covers_every_job_status():
-    """The list of terminal states exists once: the Literals in schemas."""
     from app.ws.schemas import JOB_STATUSES
 
     assert set(JOB_STATUSES) == {"queued", "running", "done", "error", "cancelled"}, (

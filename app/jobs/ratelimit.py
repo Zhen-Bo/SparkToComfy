@@ -16,7 +16,7 @@ class IpRateLimiter:
         self._limiter = MovingWindowRateLimiter(MemoryStorage())
 
     def allows(self, ip: str) -> bool:
-        """Ask without recording. Returns False once the allowance is spent."""
+        """Check without consuming the allowance."""
         return not self.enabled or self._limiter.test(self._rate, ip)
 
     def record(self, ip: str) -> None:

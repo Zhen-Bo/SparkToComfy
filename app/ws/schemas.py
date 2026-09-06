@@ -50,13 +50,12 @@ class SystemMessage(CustomModel):
 
 
 class PingMessage(CustomModel):
-    """Liveness only. A browser page cannot see the protocol-level pings uvicorn sends, so this is the frame it watches for."""
+    """Browser-visible liveness; protocol-level pings are invisible to page code."""
 
     type: Literal["ping"] = "ping"
 
 
-# scripts/gen_ws_contract.py generates the frontend constants from here, so message types and job statuses are declared once.
-# A new terminal state is one more Literal on a class below and nothing to copy anywhere else.
+# After changing message types/statuses, run scripts/gen_ws_contract.py for the frontend.
 
 WS_MESSAGES: tuple[type[CustomModel], ...] = (
     ReceiptMessage,

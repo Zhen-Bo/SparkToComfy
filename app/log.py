@@ -1,8 +1,4 @@
-"""One log pipeline for everything: structlog builds the event, stdlib carries it, one renderer prints it.
-
-The app logs through structlog; httpx, alembic and uvicorn log through stdlib and get the same
-timestamp, level, request_id and renderer via the formatter's foreign_pre_chain.
-"""
+"""Normalize structlog and third-party stdlib logs through the same processors."""
 
 import logging
 import sys
@@ -27,14 +23,13 @@ LOGGER_WIDTH = 27
 
 
 def _value(val: object) -> str:
-    """Bare strings unless they hold whitespace, '=' or quotes; then repr. Same rule as structlog's default."""
+    """Match structlog's default quoting so key/value boundaries remain readable."""
     if isinstance(val, str) and not set(val) & {" ", "\t", "=", "\r", "\n", '"', "'"}:
         return val
     return repr(val)
 
 
 def _console(colors: bool) -> ConsoleRenderer:
-    """time, level, [logger], event, key=value: the fixed-width parts first, so the eye finds them in one place."""
     dim, blue, bright, cyan, magenta, reset = (
         (DIM, BLUE, BRIGHT, CYAN, MAGENTA, RESET_ALL) if colors else ("",) * 6
     )
@@ -76,11 +71,10 @@ def _console(colors: bool) -> ConsoleRenderer:
 
 def setup(fmt: str, level: str) -> None:
     if fmt == "json":
-        # Machines read this: UTC, ISO 8601.
         stamper = structlog.processors.TimeStamper(fmt="iso")
         renderer = structlog.processors.JSONRenderer()
     else:
-        # People read this: the clock of the machine it runs on.
+        # Console timestamps follow the operator's local clock.
         stamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False)
         renderer = _console(colors=sys.stderr.isatty())
     shared = [

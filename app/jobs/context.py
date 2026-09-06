@@ -1,9 +1,3 @@
-"""The parts every job component shares.
-
-QueueMirror, JobEvents and JobsService all need comfy, db, registry and the rest, so they take one named bundle instead of eight parameters.
-Runtime fills it in.
-"""
-
 from dataclasses import dataclass
 
 from app.comfy.client import ComfyClient

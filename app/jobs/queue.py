@@ -1,8 +1,4 @@
-"""Mirror of the ComfyUI queue: who runs, who waits where, how long is left.
-
-ComfyUI events advance it, and observe() corrects it against the real queue.
-HTTP requests and new WebSocket connections read the mirror instead of asking ComfyUI for its queue.
-"""
+"""HTTP and WebSocket readers share a mirror instead of querying ComfyUI's queue."""
 
 from app.jobs.context import JobContext
 from app.ws import schemas as ws_schemas
@@ -18,8 +14,7 @@ class QueueMirror:
         return self.slots.get(prompt_id)
 
     async def mark_running(self, job) -> None:
-        """Announce the transition into running, once. observe() runs on every pass and would
-        otherwise resend running for the whole life of the job."""
+        """Repeated observations must not resend the running transition."""
         if job.status == "running":
             return
         job.status = "running"
@@ -29,10 +24,9 @@ class QueueMirror:
         )
 
     async def observe(self) -> frozenset[str] | None:
-        """Read the ComfyUI queue, recompute every job position and ETA.
+        """Return listed prompt IDs after updating positions and ETA.
 
-        Return the prompt_id of every job ComfyUI lists, or None when the queue was not read.
-        None is not an empty queue: on None nothing may be concluded about a missing job.
+        None means the queue was not read, not that it is empty; do not retire jobs.
         """
         if not self.online or not self.ctx.registry.all_jobs():
             return None

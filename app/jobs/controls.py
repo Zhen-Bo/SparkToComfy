@@ -68,7 +68,6 @@ def _check_size(name: str, raw: object, control: dict) -> object:
 
 
 def _lora_file(name: str, file: object, allowed: set[str], seen: set[str]) -> str:
-    """One lora file: it must be a declared option, and it must not repeat."""
     if not isinstance(file, str) or file not in allowed:
         raise InvalidControlValue(name, "invalid")
     if file in seen:
@@ -77,7 +76,6 @@ def _lora_file(name: str, file: object, allowed: set[str], seen: set[str]) -> st
 
 
 def _lora_strength(name: str, strength: object, limits: dict) -> float:
-    """One lora strength: a real number inside the declared range."""
     if isinstance(strength, bool) or not isinstance(strength, (int, float)):
         raise InvalidControlValue(name, "invalid")
     if not (limits["min"] <= strength <= limits["max"]):

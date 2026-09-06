@@ -1,5 +1,3 @@
-"""WebSocket entry point: accept, replay the current state, live until the peer closes."""
-
 import asyncio
 from contextlib import suppress
 from typing import Annotated
@@ -34,7 +32,6 @@ async def _read_forever(websocket: WebSocket) -> None:
 
 
 async def _replay(rt: Runtime, session_id: str, websocket: WebSocket) -> None:
-    """Catch a new connection up: engine online or not, any live job, its queue slot."""
     send = rt.hub.send_to_connection
     await send(session_id, websocket, SystemMessage(comfy_online=rt.queue.online))
     for job in rt.registry.for_session(session_id):
@@ -63,7 +60,7 @@ async def _close_slow(websocket: WebSocket) -> None:
 
 
 async def _serve(rt: Runtime, session_id: str, websocket: WebSocket) -> None:
-    """Read until the peer closes. A dead outbox means this peer cannot keep up, so close it."""
+    """Close a peer whose outbox dies even if it has not disconnected."""
     reader = asyncio.create_task(_read_forever(websocket))
     dead = asyncio.create_task(rt.hub.wait_dead(session_id, websocket))
     try:

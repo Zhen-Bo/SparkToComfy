@@ -1,5 +1,3 @@
-"""The only entry point through which routes get the Runtime."""
-
 from typing import Annotated
 
 from fastapi import Depends, Request, WebSocket

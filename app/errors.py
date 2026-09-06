@@ -60,7 +60,7 @@ class RequestIdMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            # One connection serves many requests in turn, so the context is reset here, not only set.
+            # Prevent context from a previous request leaking into this one's logs.
             structlog.contextvars.clear_contextvars()
             structlog.contextvars.bind_contextvars(
                 request_id="req_" + secrets.token_hex(6)
@@ -102,7 +102,7 @@ async def _on_http(request: Request, exc: Exception) -> JSONResponse:
 
 async def _on_validation(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, RequestValidationError):
-        # pydantic puts the offending value in each error, so only location and type may be logged.
+        # Validation errors include input values; keep them out of WARNING logs.
         set_reason(str([(e.get("loc"), e.get("type")) for e in exc.errors()]))
         logger.debug("invalid request body", errors=exc.errors())
     logger.warning("request failed", **_fields(request, 422, "unprocessable_content"))
