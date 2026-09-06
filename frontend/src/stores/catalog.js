@@ -5,10 +5,8 @@ import { computed, reactive } from 'vue'
 export const LORA_MAX = 10
 
 export const catalog = reactive({
-  // Catalog data, loaded by the API layer
   workflows: [],
 
-  // Current selection.
   // The shape of params comes from the workflow declaration; each key is a control name.
   workflowId: null,
   params: {},

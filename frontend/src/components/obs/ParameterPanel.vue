@@ -17,8 +17,6 @@ const { t } = useI18n()
         <h1 class="font-disp text-[18px] tracking-[.12em]" translate="no"><span class="text-foreground">Spark</span><span class="text-amber-bright">To</span><span class="text-foreground">Comfy</span></h1>
         <ThemeSwitcher />
       </div>
-      <!-- Connection badge, always visible, following connection.comfyOnline.
-           Online is the theme amber and offline is the same shape in warning red: both are outline badges and only the hue changes. -->
       <p class="mt-1.5 flex" role="status">
         <span
           class="flex items-center gap-1 rounded-sm border px-1.5 py-px font-sans text-[11px] font-bold tracking-[.12em]"

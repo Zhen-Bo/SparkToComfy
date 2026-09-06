@@ -26,9 +26,7 @@ const emit = defineEmits(['close'])
 
 const { t } = useI18n()
 
-/* radix Presence waits for the exit animation before unmounting (see the note in ui/Dialog.vue), but name and ctl are already null the moment it closes.
-   Reading ctl.maxLength would throw a TypeError during the exit, and a failed render stalls the close, leaving the overlay stuck open.
-   So the last values are kept for those exit frames; whether it is open still depends only on the props. */
+/* Props clear before Radix's exit animation ends; retain the last values for the remaining renders. */
 const last = ref({ name: null, ctl: null, label: '' })
 watch(
   () => props.ctl,

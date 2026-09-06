@@ -78,7 +78,7 @@ export async function generate() {
   run.currentImage = null
   run.queueAhead = null
   run.queueEtaSeconds = null
-  run.lastOutcome = null // a new run replaces the previous outcome
+  run.lastOutcome = null
   run.lastRun = { workflowId: catalog.workflowId, params: JSON.parse(JSON.stringify(catalog.params)) }
   try {
     const { promptId } = await submitGeneration({ workflowId: catalog.workflowId, params: catalog.params })
@@ -180,10 +180,7 @@ export function onReceipt({ promptId }) {
   run.promptId = promptId
 }
 
-/* One handler per terminal state.
-   The status strings come from the generated contract file, and app/ws/schemas.py is the only place they are declared.
-   To add a state: change the schema, run the codegen, add a row here.
-   A test fails for every step that is missed. */
+/* To add a job status, update app/ws/schemas.py, regenerate the contract, and add its handler here. */
 const JOB_HANDLERS = {
   [JOB_STATUS.QUEUED]: (job) => {
     if (run.phase === 'cancelling') return

@@ -232,8 +232,6 @@
     box-shadow: var(--inset-shadow);
   }
 
-  /* Global film grain, which breaks up the flat digital fill.
-     It is fixed and pointer-events-none, so it never triggers a repaint. */
   .obs-grain::after {
     content: '';
     position: fixed; inset: 0; z-index: 70; pointer-events: none;

@@ -24,7 +24,6 @@ onMounted(() => {
   const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647)
   let s = ''
   for (let i = 0; i < 90; i++) {
-    // fill=currentColor takes the star colour from text-foreground on the host svg rather than a hardcoded hex, so it follows the theme
     s += `<circle cx="${(rnd() * 100).toFixed(1)}" cy="${(rnd() * 100).toFixed(1)}" r="${(0.05 + rnd() * 0.09).toFixed(2)}" fill="currentColor" opacity="${(0.15 + rnd() * 0.5).toFixed(2)}"/>`
   }
   stars.value = s
@@ -120,7 +119,6 @@ watch(
     <!-- Dome glow -->
     <div class="pointer-events-none absolute inset-0" style="background: radial-gradient(1000px 640px at 50% 42%, hsl(var(--glow) / .06) 0%, transparent 70%)" />
 
-    <!-- Stage: the preview fills the space between the left and right columns -->
     <div ref="stage" class="relative z-10 flex min-h-0 w-full flex-1 items-center justify-center" :class="props.compact ? 'p-4' : 'p-8'">
     <!-- Viewfinder; the size animation is attached only on a size change, see animateShape -->
     <div
@@ -128,7 +126,6 @@ watch(
       :class="animateShape && 'transition-[width,height] duration-300 ease-out'"
       :style="frameStyle"
     >
-      <!-- Two-layer body: the outer frame plus the inner preview area -->
       <div
         class="absolute inset-0 rounded-[3px] border border-hairline p-[6px]"
         style="background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 88%, black)); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05)"
@@ -230,7 +227,6 @@ watch(
 </template>
 
 <style scoped>
-/* The queue overlay fades in, animating opacity only */
 .qs-ovl { animation: qsOvlIn .25s var(--ease-fluid) both; }
 @keyframes qsOvlIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -249,7 +245,6 @@ watch(
   100% { transform: translateX(100%); opacity: 0; }
 }
 
-/* The status bar rises in on the shared entry timing */
 .upsbar { animation: upsBarIn .3s var(--ease-fluid) both; }
 @keyframes upsBarIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 

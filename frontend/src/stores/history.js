@@ -20,7 +20,7 @@ export const history = reactive({
 const TIME_FMT = new Intl.DateTimeFormat(INTL_LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
 export const timeOf = (iso) => TIME_FMT.format(new Date(iso))
 
-/* onJob is a synchronous switch and nobody awaits the promises returned by finish and resumeFromHistory, so nothing inside them may reject: it would become an unhandled rejection that the screen never shows. */
+/* Some callers do not await this refresh; handle failures here so they are reported to the user. */
 export async function refreshHistory() {
   try {
     const { items, limit } = await fetchHistory()

@@ -36,7 +36,6 @@ function glyphBox(p) {
   return { x: (30 - w) / 2, y: (28 - h) / 2, w, h }
 }
 
-/** The ratio text turns with the swap: 2:3 becomes 3:2. */
 function shownRatio(label) {
   if (!size.value.landscape) return label
   const [a, b] = String(label).split(':')
