@@ -134,26 +134,21 @@ export function connectEvents(handlers) {
     ws.onclose = dropped
   }
 
-  const dispatch = (msg) => {
-    switch (msg.type) {
-      case MESSAGE_TYPE.RECEIPT:
-        return handlers.onReceipt?.({ promptId: msg.promptId })
-      case MESSAGE_TYPE.JOB:
-        return handlers.onJob?.(msg)
-      case MESSAGE_TYPE.PROGRESS: {
-        const { value, max } = msg
-        if (max <= 0) return
-        return handlers.onProgress?.({ step: value, total: max })
-      }
-      case MESSAGE_TYPE.PREVIEW:
-        return handlers.onPreview?.({ url: `data:${msg.mime};base64,${msg.data}` })
-      case MESSAGE_TYPE.SYSTEM:
-        attempts = 0
-        return handlers.onSystem?.({ comfyOnline: msg.comfyOnline })
-      case MESSAGE_TYPE.PING:
-        return // liveness only; the watchdog already counted the frame
-    }
-  }
+  const messageHandlers = new Map([
+    [MESSAGE_TYPE.RECEIPT, (msg) => handlers.onReceipt?.({ promptId: msg.promptId })],
+    [MESSAGE_TYPE.JOB, (msg) => handlers.onJob?.(msg)],
+    [MESSAGE_TYPE.PROGRESS, ({ value, max }) => {
+      if (max <= 0) return
+      return handlers.onProgress?.({ step: value, total: max })
+    }],
+    [MESSAGE_TYPE.PREVIEW, (msg) => handlers.onPreview?.({ url: `data:${msg.mime};base64,${msg.data}` })],
+    [MESSAGE_TYPE.SYSTEM, (msg) => {
+      attempts = 0
+      return handlers.onSystem?.({ comfyOnline: msg.comfyOnline })
+    }],
+  ])
+  // Ping needs no handler: the watchdog already counted the frame.
+  const dispatch = (msg) => messageHandlers.get(msg.type)?.(msg)
 
   open()
 }

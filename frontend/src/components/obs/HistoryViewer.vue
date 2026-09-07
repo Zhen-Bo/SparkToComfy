@@ -114,12 +114,18 @@ function onStageClick(e) {
 
 // Include explicit tab stops as well as buttons in the modal focus loop.
 function cycleFocus(e) {
-  const els = viewerRoot.value?.querySelectorAll('button:not([disabled]), [tabindex="0"]') ?? []
+  const root = viewerRoot.value
+  if (!root) return
+  const els = root.querySelectorAll('button:not([disabled]), [tabindex="0"]')
   if (!els.length) return
+  const first = els[0]
+  const last = els[els.length - 1]
   const active = document.activeElement
-  const inside = viewerRoot.value?.contains(active)
-  if (e.shiftKey && (!inside || active === els[0])) { e.preventDefault(); els[els.length - 1].focus() }
-  else if (!e.shiftKey && (!inside || active === els[els.length - 1])) { e.preventDefault(); els[0].focus() }
+  const edge = e.shiftKey ? first : last
+  if (root.contains(active) && active !== edge) return
+  e.preventDefault()
+  const target = e.shiftKey ? last : first
+  target.focus()
 }
 
 function panWithArrows(key) {
