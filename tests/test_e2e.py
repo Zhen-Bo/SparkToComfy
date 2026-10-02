@@ -12,13 +12,14 @@ import socket
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
+from functools import partial
 from types import SimpleNamespace
 from unittest import mock
 from urllib.parse import urlparse
 
 import pytest
 import pytest_asyncio
-from conftest import EXAMPLE_VALUES, AsgiWs, assert_camel
+from conftest import EXAMPLE_REGISTRY, EXAMPLE_VALUES, AsgiWs, assert_camel
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
@@ -78,9 +79,16 @@ async def wait_comfy_online(timeout=20):
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
 async def _lifespan(tmp_path_factory):
-    """One lifespan for the whole module: one real ComfyUI connection, one temp database."""
+    """One lifespan for the whole module: one real ComfyUI connection, one temp database.
+
+    Pin the example registry so the run does not depend on the local config/workflow.yaml.
+    """
     db_path = tmp_path_factory.mktemp("e2e") / "e2e.db"
-    with mock.patch.object(runtime, "default_db_path", return_value=db_path):
+    build = partial(runtime.build, registry=EXAMPLE_REGISTRY)
+    with (
+        mock.patch.object(runtime, "default_db_path", return_value=db_path),
+        mock.patch.object(runtime, "build", build),
+    ):
         async with app.router.lifespan_context(app):
             await wait_comfy_online()
             yield
