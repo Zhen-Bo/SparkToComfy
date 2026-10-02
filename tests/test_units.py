@@ -30,7 +30,7 @@ def example(workflows):
 @pytest.fixture
 def values():
     return {
-        "model": "krea2Turbo_v10_fp8.safetensors",
+        "model": r"krea2\krea2Turbo_v10_fp8.safetensors",
         "quality": "masterpiece",
         "positive": "1girl",
         "negative": "lowres",
@@ -52,7 +52,7 @@ def values():
 
 
 EXAMPLE_PATCHED = {
-    "20735:6196": {"unet_name": "krea2Turbo_v10_fp8.safetensors"},
+    "20735:6196": {"unet_name": r"krea2\krea2Turbo_v10_fp8.safetensors"},
     "20735:6198": {
         "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
         "type": "krea2",
