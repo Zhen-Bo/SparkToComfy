@@ -5,7 +5,8 @@ export const ZOOM_FACTOR = 1.12
 export const PAN_STEP = 40 // pan step in px for Shift plus an arrow key
 const EDGE = 16 // minimum distance between the image frame and each window edge
 const NARROW = 960 // below this the layout is the phone one (MobileStudioView takes over at the same line)
-const NARROW_TOP = 68 // the 44px top buttons plus their gap to the image
+const TOP_BAR = 72 // the 44px top bar 20px from the edge, plus an 8px gap to the image
+const SIDE_GUTTER = 72 // desktop: the 44px prev/next buttons 20px from the edge, plus an 8px gap
 const NARROW_BOTTOM = 145 // the phone bottom panel: 128px thumbnail strip + 16px padding + 1px border (see HistoryViewer.vue)
 
 export function useZoomPan(dims) {
@@ -23,9 +24,10 @@ export function useZoomPan(dims) {
   const isLandscape = computed(() => dims.value.width > dims.value.height)
 
   const narrow = computed(() => winW.value < NARROW)
-  const insets = computed(() => narrow.value ? { top: NARROW_TOP, bottom: NARROW_BOTTOM } : { top: EDGE, bottom: EDGE })
+  // Keep the fitted image clear of the top bar and, on desktop, the side arrows
+  const insets = computed(() => ({ top: TOP_BAR, bottom: narrow.value ? NARROW_BOTTOM : EDGE }))
 
-  const stageW = computed(() => winW.value - (narrow.value ? 8 : EDGE) * 2)
+  const stageW = computed(() => winW.value - (narrow.value ? 8 : SIDE_GUTTER) * 2)
   const stageH = computed(() => winH.value - insets.value.top - insets.value.bottom)
   const centerY = computed(() => (winH.value + insets.value.top - insets.value.bottom) / 2)
 

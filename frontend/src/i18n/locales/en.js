@@ -177,6 +177,7 @@ export default {
     hintCopy: 'CTRL+C ─ Copy',
     close: 'Close (ESC)',
     backfill: 'Restore all parameters',
+    backfillLabel: 'Restore',
     download: 'Download image',
   },
   notify: {

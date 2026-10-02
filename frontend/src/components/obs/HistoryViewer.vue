@@ -189,40 +189,43 @@ function backfill() {
 
       <div class="sr-only" aria-live="polite">{{ t('viewer.counter', { n: idx + 1, total: entries.length }) }}</div>
 
-      <!-- Below 360px the hint would collide with the three action buttons -->
-      <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline max-[359px]:hidden">
+      <!-- On narrow phones the hint would collide with the actions; pinch zoom is native there anyway -->
+      <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline max-[439px]:hidden">
         <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
           <span class="flex items-center gap-1 whitespace-nowrap"><PhArrowsOutSimple class="h-3.5 w-3.5" aria-hidden="true" /><span class="max-[959px]:hidden">{{ t('viewer.hintZoom') }}</span><span class="min-[960px]:hidden">{{ t('viewer.hintPinch') }}</span></span>
           <span class="whitespace-nowrap max-[959px]:hidden">{{ t('viewer.hintCopy') }}</span>
         </div>
       </div>
 
-      <div class="absolute right-5 top-5 z-20 flex flex-col gap-2.5 max-[959px]:flex-row-reverse">
+      <!-- The image fit reserves this bar's height (TOP_BAR in useZoomPan.js). Close stands apart so a mis-tap never restores. -->
+      <div class="absolute right-5 top-5 z-20 flex items-center gap-2">
+        <button
+          type="button"
+          :title="t('viewer.backfill')"
+          :aria-disabled="locked || undefined"
+          class="obs-tr flex h-11 items-center gap-2 whitespace-nowrap rounded-sm bg-amber pl-3 pr-4 font-disp text-[11px] tracking-[.2em] text-[hsl(var(--primary-foreground))] active:scale-95"
+          :class="locked ? 'cursor-not-allowed opacity-40' : 'hover:bg-amber-bright'"
+          @click="backfill"
+        ><PhArrowSquareIn class="h-[18px] w-[18px]" aria-hidden="true" />{{ t('viewer.backfillLabel') }}</button>
+        <!-- Stays in place when the image fails, so the bar does not reflow -->
+        <a
+          :href="showImage ? src : undefined"
+          download
+          :title="t('viewer.download')"
+          :aria-label="t('viewer.download')"
+          :aria-disabled="!showImage || undefined"
+          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground active:scale-95"
+          :class="showImage ? 'hover:shadow-[inset_0_0_0_999px_hsl(var(--foreground)/.12)]' : 'pointer-events-none opacity-40'"
+        ><PhDownloadSimple class="h-[18px] w-[18px]" aria-hidden="true" /></a>
+        <span class="mx-1.5 h-6 w-px bg-hairline" aria-hidden="true" />
         <button
           ref="closeBtn"
           type="button"
           :title="t('viewer.close')"
           :aria-label="t('viewer.close')"
-          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:shadow-[inset_0_0_0_999px_hsl(var(--foreground)/.12)] active:scale-95"
+          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm border border-control text-muted-foreground hover:border-amber hover:text-foreground active:scale-95"
           @click="emit('close')"
         ><PhX class="h-[18px] w-[18px]" aria-hidden="true" /></button>
-        <button
-          type="button"
-          :title="t('viewer.backfill')"
-          :aria-label="t('viewer.backfill')"
-          :aria-disabled="locked || undefined"
-          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-amber text-[hsl(var(--primary-foreground))] shadow-[0_2px_10px_hsl(var(--amber)/.3)] active:scale-95"
-          :class="locked ? 'cursor-not-allowed opacity-40 shadow-none' : 'hover:bg-amber-bright'"
-          @click="backfill"
-        ><PhArrowSquareIn class="h-[18px] w-[18px]" aria-hidden="true" /></button>
-        <a
-          v-if="showImage"
-          :href="src"
-          download
-          :title="t('viewer.download')"
-          :aria-label="t('viewer.download')"
-          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:shadow-[inset_0_0_0_999px_hsl(var(--foreground)/.12)] active:scale-95"
-        ><PhDownloadSimple class="h-[18px] w-[18px]" aria-hidden="true" /></a>
       </div>
 
       <!-- The padding mirrors the useZoomPan insets, so flex centring centres on the stage box, not the raw window -->
