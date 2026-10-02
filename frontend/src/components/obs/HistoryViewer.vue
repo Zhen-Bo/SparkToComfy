@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { sizeOf } from '@/stores/catalog'
 import { restoreFromHistory, timeOf } from '@/stores/history'
 import { locked } from '@/stores/run'
-import { PhX, PhArrowSquareIn, PhCaretLeft, PhCaretRight, PhImageBroken, PhArrowsOutSimple } from '@phosphor-icons/vue'
+import { PhX, PhArrowSquareIn, PhCaretLeft, PhCaretRight, PhImageBroken, PhArrowsOutSimple, PhDownloadSimple } from '@phosphor-icons/vue'
 import ViewerDock from '@/components/obs/ViewerDock.vue'
 
 const { t } = useI18n()
@@ -116,7 +116,7 @@ function onStageClick(e) {
 function cycleFocus(e) {
   const root = viewerRoot.value
   if (!root) return
-  const els = root.querySelectorAll('button:not([disabled]), [tabindex="0"]')
+  const els = root.querySelectorAll('button:not([disabled]), a[href], [tabindex="0"]')
   if (!els.length) return
   const first = els[0]
   const last = els[els.length - 1]
@@ -214,6 +214,14 @@ function backfill() {
           :class="locked ? 'cursor-not-allowed opacity-40 shadow-none' : 'hover:bg-amber-bright'"
           @click="backfill"
         ><PhArrowSquareIn class="h-[18px] w-[18px]" aria-hidden="true" /></button>
+        <a
+          v-if="showImage"
+          :href="src"
+          download
+          :title="t('viewer.download')"
+          :aria-label="t('viewer.download')"
+          class="obs-tr flex h-11 w-11 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:shadow-[inset_0_0_0_999px_hsl(var(--foreground)/.12)] active:scale-95"
+        ><PhDownloadSimple class="h-[18px] w-[18px]" aria-hidden="true" /></a>
       </div>
 
       <!-- The padding mirrors the useZoomPan insets, so flex centring centres on the stage box, not the raw window -->

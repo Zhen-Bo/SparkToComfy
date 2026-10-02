@@ -178,6 +178,7 @@ export default {
     hintCopy: 'CTRL+C ─ 複製',
     close: '關閉（ESC）',
     backfill: '回填全部參數',
+    download: '下載圖片',
   },
   notify: {
     generateFailed: '生成失敗：{reason}',

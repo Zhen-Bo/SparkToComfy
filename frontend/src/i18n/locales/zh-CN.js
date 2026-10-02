@@ -177,6 +177,7 @@ export default {
     hintCopy: 'CTRL+C ─ 复制',
     close: '关闭（ESC）',
     backfill: '回填全部参数',
+    download: '下载图片',
   },
   notify: {
     generateFailed: '生成失败：{reason}',

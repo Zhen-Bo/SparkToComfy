@@ -177,6 +177,7 @@ export default {
     hintCopy: 'CTRL+C ─ Copy',
     close: 'Close (ESC)',
     backfill: 'Restore all parameters',
+    download: 'Download image',
   },
   notify: {
     generateFailed: 'Generation failed: {reason}',
