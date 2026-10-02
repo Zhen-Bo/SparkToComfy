@@ -1,8 +1,8 @@
 /* 與 zh-CN.js / en.js 保持相同 key；插值使用 {name}，含樣式的讀數使用 i18n-t 具名 slot。 */
 export default {
   app: {
-    titleStudio: 'SparkToComfy — ComfyUI Studio',
-    titlePlayground: '元件總覽 — SparkToComfy Playground',
+    titleStudio: 'SparkToComfy ・ ComfyUI Studio',
+    titlePlayground: '元件總覽 ・ SparkToComfy Playground',
   },
   common: {
     value: '數值', // 裸控件的無障礙名稱預設（ui/Slider、obs/ParamSlider）

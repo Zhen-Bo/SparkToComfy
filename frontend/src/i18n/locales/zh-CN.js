@@ -1,8 +1,8 @@
 /** 简体中文（zh-CN）— key 结构同 zh-TW.js */
 export default {
   app: {
-    titleStudio: 'SparkToComfy — ComfyUI Studio',
-    titlePlayground: '组件总览 — SparkToComfy Playground',
+    titleStudio: 'SparkToComfy ・ ComfyUI Studio',
+    titlePlayground: '组件总览 ・ SparkToComfy Playground',
   },
   common: {
     value: '数值',

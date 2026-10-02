@@ -1,8 +1,8 @@
 /** English (en) — fallback locale; key structure identical to zh-TW.js */
 export default {
   app: {
-    titleStudio: 'SparkToComfy — ComfyUI Studio',
-    titlePlayground: 'Components Overview — SparkToComfy Playground',
+    titleStudio: 'SparkToComfy ・ ComfyUI Studio',
+    titlePlayground: 'Components Overview ・ SparkToComfy Playground',
   },
   common: {
     value: 'Value',
@@ -35,7 +35,7 @@ export default {
     scheduler: 'Scheduler',
     upscale: 'Upscale',
     lora: 'LoRA',
-    positiveHint: 'Describe the picture you want — comma-separated tags or a plain sentence both work',
+    positiveHint: 'Describe the picture you want. Comma-separated tags and plain sentences both work.',
   },
   theme: {
     switch: 'Switch color theme',
@@ -154,7 +154,7 @@ export default {
     empty: 'No results in this session.',
     clearAll: 'Clear all history',
     expand: 'Expand history rail',
-    expandUnread: 'Expand history rail — {n} new',
+    expandUnread: 'Expand history rail ({n} new)',
     collapse: 'Collapse history rail',
     viewAt: 'View history image {n} of {total} ({time})',
     clear: {
@@ -199,7 +199,7 @@ export default {
     not_found: 'Not found',
     method_not_allowed: 'Wrong request method',
     unprocessable_content: 'Malformed request body',
-    job_active: 'A job is already running — wait for it to finish',
+    job_active: 'A job is already running. Wait for it to finish.',
     rate_limited: 'Too many requests, try again shortly',
     internal_error: 'Backend error',
     comfyui_unreachable: 'ComfyUI is unreachable',
@@ -228,7 +228,7 @@ export default {
     steps: 'Steps',
     positivePrompt: 'Positive prompt',
     sliderAria: 'Basic slider',
-    tabsNote: 'Current tab: {tab} ・ control only — panel contents live in the workspace',
+    tabsNote: 'Current tab: {tab} ・ Control only, panel contents live in the workspace',
     ctaNote: 'Demos its own busy state only ・ real generation runs from the workspace panel',
     catalog: {
       slider: { name: 'Basic slider', meta: '3px track ・ amber range ・ hover 1.1×' },
@@ -257,7 +257,7 @@ export default {
       tabs: ['←/→ moves selection', 'Active tab gets a 2px amber line', 'Shares PanelTabs with the parameter panel'],
       qs: ['07→01 countdown then ready (1.4s sweep), loops forever', 'Solid amber = tasks ahead ・ blinking = your spot ・ +N is absolutely positioned off-center', 'Driven locally; the workspace drives the same component via store.phase'],
       cta: ['Only clicks trigger → busy dims and locks', 'Pure button state, no progress, no other rows', 'Same component as the panel’s generate row (demo prop)', 'Busy label follows phase: queued…／preparing…／generating…／upscaling…'],
-      stage: ['Four-phase loop: queue 07→01 → prep 1.4s → progress 0→100 → upscale sweep 2.4s', 'Driven independently — no generate(), no history cards', 'Frame aspect follows the size row live', 'Corner brackets + starfield + crosshair'],
+      stage: ['Four-phase loop: queue 07→01 → prep 1.4s → progress 0→100 → upscale sweep 2.4s', 'Driven independently: no generate(), no history cards', 'Frame aspect follows the size row live', 'Corner brackets + starfield + crosshair'],
       history: ['Square meet frames, uncropped', 'Whole card opens the viewer overlay', 'Header row collapses the rail', 'Collapsed: entry button at the stage top-right, with an unread badge'],
     },
   },
