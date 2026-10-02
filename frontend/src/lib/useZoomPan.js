@@ -6,7 +6,8 @@ export const PAN_STEP = 40 // pan step in px for Shift plus an arrow key
 const EDGE = 16 // minimum distance between the image frame and each window edge
 const NARROW = 960 // below this the layout is the phone one (MobileStudioView takes over at the same line)
 const NARROW_SIDE = 8
-const TOP_BAR = 72 // the 44px top bar 20px from the edge, plus an 8px gap to the image
+const BAR_GAP = 8 // space between the image and a bar, so the frame's corner brackets stay visible
+const TOP_BAR = 20 + 44 + BAR_GAP // the 44px top bar sits 20px from the edge
 
 /**
  * topClear: px from either top corner the hint and action bar occupy; the image only gives up the top band when it would reach them.
@@ -34,8 +35,9 @@ export function useZoomPan(dims, { topClear, bottomBar }) {
     const a = dims.value.width / dims.value.height
     const fullW = winW.value - side.value * 2
     const fit = (w, top, bottom) => ({ stageW: w, top, bottom, shown: Math.min(w, (winH.value - top - bottom) * a) })
-    const below = fit(fullW, TOP_BAR, narrow.value ? bottomBar.value : EDGE)
-    const between = fit(Math.min(fullW, winW.value - topClear.value * 2), EDGE, narrow.value ? bottomBar.value : EDGE)
+    const bottom = narrow.value ? bottomBar.value + BAR_GAP : EDGE
+    const below = fit(fullW, TOP_BAR, bottom)
+    const between = fit(Math.min(fullW, winW.value - topClear.value * 2), EDGE, bottom)
     return between.shown >= below.shown ? between : below
   })
   const insets = computed(() => ({ top: layout.value.top, bottom: layout.value.bottom }))

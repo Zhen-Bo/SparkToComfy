@@ -71,6 +71,11 @@ function trackNav(e) {
   navSide.value = e.clientX < NAV_ZONE ? 'left' : e.clientX > window.innerWidth - NAV_ZONE ? 'right' : null
 }
 const navShown = (side) => !hoverCapable || navSide.value === side
+// A mouse click must not leave the arrow focused, or it would stay visible after the pointer leaves
+function navClick(e, d) {
+  go(d)
+  if (e.detail > 0) e.currentTarget.blur()
+}
 // Centre the arrows on the image area, which sits lower when the top bar is reserved
 const navStyle = computed(() => ({ top: `calc(50% + ${(insets.value.top - insets.value.bottom) / 2}px)` }))
 
@@ -314,7 +319,7 @@ function backfill() {
           class="stage-nav absolute left-5 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
           :class="{ 'nav-on': navShown('left') }"
           :style="navStyle"
-          @click.stop="go(-1)"
+          @click.stop="navClick($event, -1)"
         ><PhCaretLeft class="h-[18px] w-[18px]" aria-hidden="true" /></button>
         <button
           type="button"
@@ -323,7 +328,7 @@ function backfill() {
           class="stage-nav absolute right-5 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
           :class="{ 'nav-on': navShown('right') }"
           :style="navStyle"
-          @click.stop="go(1)"
+          @click.stop="navClick($event, 1)"
         ><PhCaretRight class="h-[18px] w-[18px]" aria-hidden="true" /></button>
       </div>
 
