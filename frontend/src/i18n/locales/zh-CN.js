@@ -74,7 +74,7 @@ export default {
     title: 'ComfyUI 离线',
     desc: '等待 ComfyUI 重新连接',
     reconnectTitle: '后端连接中断',
-    reconnectDesc: '每秒重试连接',
+    reconnectDesc: '正在自动重新连接',
     badge: { online: '已连接', offline: '离线' }, // 标题恒亮徽章,跟 comfyOnline
     metaWait: 'SIGNAL LOST ─ {elapsed}', // 引擎熄：纯等待计时
     metaRetry: 'RETRY #{n} ─ {elapsed} ─ NEXT {next}s', // 后端断线：重试次数＋起算计时＋退避倒数

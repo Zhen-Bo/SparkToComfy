@@ -74,7 +74,7 @@ export default {
     title: 'ComfyUI Offline',
     desc: 'Waiting for ComfyUI to reconnect',
     reconnectTitle: 'Backend Disconnected',
-    reconnectDesc: 'Retrying the connection every second',
+    reconnectDesc: 'Reconnecting automatically',
     badge: { online: 'Connected', offline: 'Offline' }, // persistent header badge, follows comfyOnline
     metaWait: 'SIGNAL LOST ─ {elapsed}', // engine down: pure waiting timer
     metaRetry: 'RETRY #{n} ─ {elapsed} ─ NEXT {next}s', // backend down: retry count + elapsed + backoff countdown
