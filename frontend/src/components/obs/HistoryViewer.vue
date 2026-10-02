@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useModalLayer } from '@/lib/useModalLayer'
 import { useCopyImage } from '@/lib/useCopyImage'
+import { hoverCapable } from '@/lib/pointer'
 import { PAN_STEP, ZOOM_FACTOR, useZoomPan } from '@/lib/useZoomPan'
 import { useI18n } from 'vue-i18n'
 import { sizeOf } from '@/stores/catalog'
@@ -45,10 +46,33 @@ const failed = ref(false)
 const src = computed(() => entry.value.images?.[0] ?? null)
 const showImage = computed(() => !!src.value && !failed.value)
 
+// The fit reads the real sizes of the corner controls and the phone strip; labels and scrollbars change them
+const hintEl = ref(null)
+const barEl = ref(null)
+const stripPanel = ref(null)
+const topClear = ref(0)
+const bottomBar = ref(145)
+const CORNER_GAP = 20 + 8 // the controls' 20px edge offset plus 8px breathing room
+const sizes = new ResizeObserver(() => {
+  topClear.value = Math.max(hintEl.value?.offsetWidth ?? 0, barEl.value?.offsetWidth ?? 0) + CORNER_GAP
+  if (stripPanel.value?.offsetHeight) bottomBar.value = stripPanel.value.offsetHeight
+})
+
 const {
   scale, dragging, pinching, gesturing, frameStyle, transform, insets,
   fitToStage, zoom, panBy, onWheel, onPointerDown, onPointerMove, onPointerUp,
-} = useZoomPan(dims)
+} = useZoomPan(dims, { topClear, bottomBar })
+
+// Desktop arrows appear when the pointer nears their side; without real hover they stay visible
+const NAV_ZONE = 160
+const navSide = ref(null)
+function trackNav(e) {
+  if (!hoverCapable) return
+  navSide.value = e.clientX < NAV_ZONE ? 'left' : e.clientX > window.innerWidth - NAV_ZONE ? 'right' : null
+}
+const navShown = (side) => !hoverCapable || navSide.value === side
+// Centre the arrows on the image area, which sits lower when the top bar is reserved
+const navStyle = computed(() => ({ top: `calc(50% + ${(insets.value.top - insets.value.bottom) / 2}px)` }))
 
 const { toClipboard } = useCopyImage()
 const copyImage = () => { if (showImage.value) toClipboard(src.value) }
@@ -161,10 +185,14 @@ function onKeydown(e) {
 
 useModalLayer(closeBtn)
 onMounted(() => {
+  for (const el of [hintEl.value, barEl.value, stripPanel.value]) if (el) sizes.observe(el)
   fitToStage()
   document.addEventListener('keydown', onKeydown)
 })
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  sizes.disconnect()
+  document.removeEventListener('keydown', onKeydown)
+})
 
 // aria-disabled preserves focus but does not block clicks, so guard the action explicitly.
 function backfill() {
@@ -184,13 +212,15 @@ function backfill() {
       aria-modal="true"
       :aria-label="t('viewer.aria')"
       @wheel="onWheel"
+      @pointermove="trackNav"
+      @pointerleave="navSide = null"
     >
       <div class="absolute inset-0 bg-overlay/90" :class="gesturing ? '' : 'backdrop-blur-[3px]'" />
 
       <div class="sr-only" aria-live="polite">{{ t('viewer.counter', { n: idx + 1, total: entries.length }) }}</div>
 
       <!-- On narrow phones the hint would collide with the actions; pinch zoom is native there anyway -->
-      <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline max-[439px]:hidden">
+      <div ref="hintEl" class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline max-[439px]:hidden">
         <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
           <span class="flex items-center gap-1 whitespace-nowrap"><PhArrowsOutSimple class="h-3.5 w-3.5" aria-hidden="true" /><span class="max-[959px]:hidden">{{ t('viewer.hintZoom') }}</span><span class="min-[960px]:hidden">{{ t('viewer.hintPinch') }}</span></span>
           <span class="whitespace-nowrap max-[959px]:hidden">{{ t('viewer.hintCopy') }}</span>
@@ -198,7 +228,7 @@ function backfill() {
       </div>
 
       <!-- The image fit reserves this bar's height (TOP_BAR in useZoomPan.js). Close stands apart so a mis-tap never restores. -->
-      <div class="absolute right-5 top-5 z-20 flex items-center gap-2">
+      <div ref="barEl" class="absolute right-5 top-5 z-20 flex items-center gap-2">
         <button
           type="button"
           :title="t('viewer.backfill')"
@@ -281,20 +311,24 @@ function backfill() {
           type="button"
           :title="t('viewer.prevTitle')"
           :aria-label="t('viewer.prev')"
-          class="stage-nav obs-tr absolute left-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
+          class="stage-nav absolute left-5 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
+          :class="{ 'nav-on': navShown('left') }"
+          :style="navStyle"
           @click.stop="go(-1)"
         ><PhCaretLeft class="h-[18px] w-[18px]" aria-hidden="true" /></button>
         <button
           type="button"
           :title="t('viewer.nextTitle')"
           :aria-label="t('viewer.next')"
-          class="stage-nav obs-tr absolute right-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
+          class="stage-nav absolute right-5 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-sm bg-[hsl(var(--edgeline))] text-foreground hover:bg-amber hover:text-[hsl(var(--primary-foreground))] active:scale-95"
+          :class="{ 'nav-on': navShown('right') }"
+          :style="navStyle"
           @click.stop="go(1)"
         ><PhCaretRight class="h-[18px] w-[18px]" aria-hidden="true" /></button>
       </div>
 
-      <!-- Phone thumbnail strip; the fit reserves its height: 128px thumbs + 16px padding + 1px border = 145px (NARROW_BOTTOM in useZoomPan.js) -->
-      <div class="obs-panel absolute inset-x-0 bottom-0 z-20 border-t border-hairline min-[960px]:hidden">
+      <!-- Phone thumbnail strip; the fit reserves its measured height, which grows when a scrollbar appears -->
+      <div ref="stripPanel" class="obs-panel absolute inset-x-0 bottom-0 z-20 border-t border-hairline min-[960px]:hidden">
         <div ref="stripEl" class="flex gap-2.5 overflow-x-auto p-2">
           <button
             v-for="(e, i) in entries"
@@ -355,6 +389,11 @@ function backfill() {
   opacity: 0;
   transform: translateX(28px);
 }
+
+/* Fade rather than toggle, so the arrow eases in as the pointer reaches its side. */
+.stage-nav { opacity: 0; transition: opacity .16s var(--ease-fluid), color .2s var(--ease-fluid), background-color .2s var(--ease-fluid), transform .2s var(--ease-fluid); }
+.stage-nav.nav-on,
+.stage-nav:focus-visible { opacity: 1; }
 
 /* On the phone layout the finger switches images directly, so the edge arrows only cover the image. */
 @media (max-width: 959px) {

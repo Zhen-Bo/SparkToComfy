@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PhCaretLeft, PhCaretRight } from '@phosphor-icons/vue'
+import { hoverCapable } from '@/lib/pointer'
 
 const { t } = useI18n()
 
@@ -12,10 +13,6 @@ defineProps({
 })
 const emit = defineEmits(['go', 'close'])
 
-/* Keep the dock visible on touch-capable hybrids even when their mouse supports hover. */
-const hoverCapable = typeof matchMedia !== 'undefined'
-  && matchMedia('(hover: hover)').matches
-  && !matchMedia('(any-pointer: coarse)').matches
 const up = ref(!hoverCapable)
 const el = ref(null)
 
