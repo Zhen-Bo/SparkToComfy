@@ -189,7 +189,8 @@ function backfill() {
 
       <div class="sr-only" aria-live="polite">{{ t('viewer.counter', { n: idx + 1, total: entries.length }) }}</div>
 
-      <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline">
+      <!-- Below 360px the hint would collide with the three action buttons -->
+      <div class="obs-ghost pointer-events-auto absolute left-5 top-5 z-20 flex border border-hairline max-[359px]:hidden">
         <div class="flex flex-none flex-wrap gap-x-4 gap-y-1 px-4 py-2.5 font-mono text-[12px] leading-[1.7] text-foreground">
           <span class="flex items-center gap-1 whitespace-nowrap"><PhArrowsOutSimple class="h-3.5 w-3.5" aria-hidden="true" /><span class="max-[959px]:hidden">{{ t('viewer.hintZoom') }}</span><span class="min-[960px]:hidden">{{ t('viewer.hintPinch') }}</span></span>
           <span class="whitespace-nowrap max-[959px]:hidden">{{ t('viewer.hintCopy') }}</span>
