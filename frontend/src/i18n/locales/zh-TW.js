@@ -97,6 +97,9 @@ export default {
     retry: '重試',
     retryAria: '用同一組參數重試上一次生成',
     dismiss: '關閉本次狀態',
+    guide: '在左側面板寫下提示詞，再按「開始生成」',
+    guideMobile: '展開下方面板寫下提示詞，再按「開始生成」',
+    guideShortcut: '直接生成',
   },
   cancelRun: {
     titleRunning: '取消目前的生成',

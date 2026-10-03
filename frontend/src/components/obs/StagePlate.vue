@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { catalog, currentDims, outputDims } from '@/stores/catalog'
 import { dismissOutcome, queueEta, retryLastRun, run } from '@/stores/run'
+import { history } from '@/stores/history'
+import { MOD_KEY } from '@/lib/shortcut'
 import QueueSlots from '@/components/obs/QueueSlots.vue'
 import { PhX } from '@phosphor-icons/vue'
 
@@ -64,6 +66,11 @@ const progressPct = computed(() =>
 const stepDigits = computed(() => String(run.progress?.total ?? 0).length)
 
 const SCAN = new Set(['upscaling', 'transfer'])
+
+// First-visit guide: gone for good once this session has any result, or while anything else occupies the stage
+const showGuide = computed(() =>
+  !run.busy && !run.currentImage && !run.lastOutcome && catalog.workflows.length > 0 && history.entries.length === 0,
+)
 
 const scanning = computed(() => SCAN.has(run.phase))
 const upscaling = computed(() => run.phase !== 'transfer' && Number(catalog.params.upscale) > 1)
@@ -148,6 +155,28 @@ watch(
         <div class="absolute -left-3.5 -right-3.5 top-1/2 h-px" style="background: linear-gradient(to right, transparent, hsl(var(--amber) / .35) 30%, hsl(var(--amber) / .35) 70%, transparent)" />
       </div>
     </div>
+    <!-- Anchored to the stage, not the frame, so a small frame (a sideways phone, a tall preset) never squeezes the text.
+         The frame is centred in the stage, so the stage centre is the crosshair centre. The crosshair lines are 1px
+         wide and start at that centre, so their own centre is half a pixel past it: the text is offset to match.
+         Each line is placed on its own, 8px clear of the horizontal line above and below, so that line runs exactly
+         through the gap; each backing hides the vertical line where it crosses the text. A single line sits on the centre. -->
+    <Transition name="guide">
+      <div v-if="showGuide" class="pointer-events-none absolute inset-0 z-10">
+        <span
+          class="absolute left-[calc(50%+.5px)] w-max max-w-[90%] -translate-x-1/2 rounded-sm bg-plate-bg/90 px-2.5 py-1 text-center text-[13px] leading-snug text-muted-foreground"
+          :class="props.compact ? 'top-[calc(50%+.5px)] -translate-y-1/2' : 'bottom-[calc(50%+8px)]'"
+        >{{ t(props.compact ? 'stage.guideMobile' : 'stage.guide') }}</span>
+        <span
+          v-if="!props.compact"
+          class="absolute left-[calc(50%+.5px)] top-[calc(50%+9px)] flex w-max -translate-x-1/2 items-center gap-1.5 rounded-sm bg-plate-bg/90 px-2.5 py-1 text-[11px] text-ink-faint"
+        >
+          <kbd class="rounded-[3px] border border-hairline px-1.5 py-px font-mono text-[11px] text-muted-foreground" translate="no">{{ MOD_KEY.label }}</kbd>
+          <span aria-hidden="true">+</span>
+          <kbd class="rounded-[3px] border border-hairline px-1.5 py-px font-mono text-[11px] text-muted-foreground" translate="no">Enter</kbd>
+          <span>{{ t('stage.guideShortcut') }}</span>
+        </span>
+      </div>
+    </Transition>
     </div>
 
     <div
@@ -224,6 +253,10 @@ watch(
 
 .upsbar { animation: upsBarIn .3s var(--ease-fluid) both; }
 @keyframes upsBarIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.guide-enter-active { transition: opacity .3s var(--ease-fluid); }
+.guide-leave-active { transition: opacity .15s ease-out; }
+.guide-enter-from, .guide-leave-to { opacity: 0; }
 
 .art-enter { animation: artIn .26s var(--ease-fluid) both; }
 @keyframes artIn {

@@ -96,6 +96,9 @@ export default {
     retry: 'Retry',
     retryAria: 'Retry the last run with the same parameters',
     dismiss: 'Dismiss this status',
+    guide: 'Write a prompt in the panel, then press Generate',
+    guideMobile: 'Open the panel below to write a prompt, then press Generate',
+    guideShortcut: 'to generate',
   },
   cancelRun: {
     titleRunning: 'Cancel this generation',
