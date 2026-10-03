@@ -60,6 +60,9 @@ export default {
   sheet: {
     expand: 'Expand the parameter panel',
     collapse: 'Collapse the parameter panel',
+    title: 'Parameters',
+    promptEmpty: 'Tap to write a prompt',
+    steps: '{n} steps',
   },
   queue: {
     ahead: '{n} tasks ahead',

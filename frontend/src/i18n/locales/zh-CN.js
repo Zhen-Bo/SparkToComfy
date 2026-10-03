@@ -60,6 +60,9 @@ export default {
   sheet: {
     expand: '展开参数面板',
     collapse: '收起参数面板',
+    title: '参数设置',
+    promptEmpty: '点这里写提示词',
+    steps: '{n} 步',
   },
   queue: {
     ahead: '前方还有 {n} 个任务',

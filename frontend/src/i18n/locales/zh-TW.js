@@ -61,6 +61,9 @@ export default {
   sheet: {
     expand: '展開參數面板',
     collapse: '收合參數面板',
+    title: '參數設定',
+    promptEmpty: '點這裡寫提示詞',
+    steps: '{n} 步',
   },
   queue: {
     ahead: '前方還有 {n} 個任務',

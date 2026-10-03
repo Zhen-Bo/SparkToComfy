@@ -9,6 +9,7 @@ import StagePlate from '@/components/obs/StagePlate.vue'
 import MobileSheet from '@/components/obs/MobileSheet.vue'
 import GenerateButton from '@/components/obs/GenerateButton.vue'
 import HistoryViewer from '@/components/obs/HistoryViewer.vue'
+import ThemeSwitcher from '@/components/obs/ThemeSwitcher.vue'
 import { PhClockCounterClockwise } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
@@ -38,6 +39,7 @@ function onStageTap(e) {
   <div class="obs-grain flex h-dvh flex-col overflow-hidden">
     <header class="obs-panel flex flex-none items-center justify-between gap-3 border-b border-hairline px-4 py-[21px] short:py-2">
       <h1 class="font-disp text-[18px] tracking-[.12em]" translate="no"><span class="text-foreground">Spark</span><span class="text-amber-bright">To</span><span class="text-foreground">Comfy</span></h1>
+      <div class="flex items-center gap-3">
       <p role="status">
         <span
           class="flex items-center gap-1 rounded-sm border px-1.5 py-px font-sans text-[11px] font-bold tracking-[.12em]"
@@ -51,10 +53,12 @@ function onStageTap(e) {
           {{ t(connection.comfyOnline ? 'offline.badge.online' : 'offline.badge.offline') }}
         </span>
       </p>
+      <ThemeSwitcher />
+      </div>
     </header>
 
     <!-- The bottom padding keeps the stage's status bars above the collapsed strip; overflow-hidden clips the collapsed sheet off the generate row -->
-    <div class="relative min-h-0 flex-1 overflow-hidden pb-[22px]" @click="onStageTap">
+    <div class="relative min-h-0 flex-1 overflow-hidden" :style="{ paddingBottom: `${(sheetRef?.stripH || 21) + 1}px` }" @click="onStageTap">
       <StagePlate class="h-full" compact />
       <div
         class="pointer-events-none absolute inset-0 z-20 backdrop-blur-sm transition-opacity duration-300"

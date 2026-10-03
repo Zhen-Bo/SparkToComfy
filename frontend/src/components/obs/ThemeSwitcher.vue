@@ -14,11 +14,17 @@ const triggerBtn = ref(null)
 const itemRefs = ref([])
 const menuStyle = ref({})
 
-/** Position in viewport coordinates; the menu lives on body to escape panel overflow clipping. */
+/** Position in viewport coordinates; the menu lives on body to escape panel overflow clipping.
+ * Near the right edge (the phone header) it opens leftward from the trigger instead of running off screen. */
+const MENU_W = 228
+const EDGE = 8
 function place() {
   if (!root.value) return
   const r = root.value.getBoundingClientRect()
-  menuStyle.value = { left: `${r.left}px`, top: `${r.bottom + 6}px` }
+  const fits = r.left + MENU_W <= window.innerWidth - EDGE
+  menuStyle.value = fits
+    ? { left: `${r.left}px`, top: `${r.bottom + 6}px`, transformOrigin: 'top left' }
+    : { left: `${Math.max(EDGE, r.right - MENU_W)}px`, top: `${r.bottom + 6}px`, transformOrigin: 'top right' }
 }
 async function toggle() {
   if (!open.value) place()
@@ -83,6 +89,7 @@ function pick(id) {
 
 <template>
   <div ref="root" class="relative">
+    <!-- The pseudo-element widens the touch target past the 32px box without changing the layout -->
     <button
       ref="triggerBtn"
       type="button"
@@ -90,10 +97,8 @@ function pick(id) {
       :aria-label="t('theme.switch')"
       aria-haspopup="menu"
       :aria-expanded="open"
-      :class="cn(
-        'obs-tr flex h-8 w-8 items-center justify-center rounded-sm border active:scale-95',
-        open ? 'border-amber text-amber' : 'border-control text-muted-foreground hover:border-amber hover:text-foreground',
-      )"
+      class="obs-tr relative flex h-8 w-8 items-center justify-center rounded-sm border before:absolute before:-inset-1.5 before:content-[''] active:scale-95"
+      :class="open ? 'border-amber text-amber' : 'border-control text-muted-foreground hover:border-amber hover:text-foreground'"
       @click.stop="toggle"
       @keydown.esc="closeMenu({ refocus: false })"
     >
@@ -137,8 +142,8 @@ function pick(id) {
 </template>
 
 <style scoped>
-.ts-menu-enter-active { transition: opacity 150ms var(--ease-fluid), transform 150ms var(--ease-fluid); transform-origin: top left; }
-.ts-menu-leave-active { transition: opacity 120ms var(--ease-fluid), transform 120ms var(--ease-fluid); transform-origin: top left; }
+.ts-menu-enter-active { transition: opacity 150ms var(--ease-fluid), transform 150ms var(--ease-fluid); }
+.ts-menu-leave-active { transition: opacity 120ms var(--ease-fluid), transform 120ms var(--ease-fluid); }
 .ts-menu-enter-from,
 .ts-menu-leave-to { opacity: 0; transform: scale(.97); }
 </style>
