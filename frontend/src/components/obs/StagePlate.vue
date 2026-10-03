@@ -1,12 +1,13 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { catalog, currentDims, outputDims } from '@/stores/catalog'
 import { dismissOutcome, queueEta, retryLastRun, run } from '@/stores/run'
 import { history } from '@/stores/history'
 import { MOD_KEY } from '@/lib/shortcut'
 import QueueSlots from '@/components/obs/QueueSlots.vue'
-import { PhX } from '@phosphor-icons/vue'
+import HistoryViewer from '@/components/obs/HistoryViewer.vue'
+import { PhArrowsOutSimple, PhX } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
 
@@ -67,6 +68,27 @@ const stepDigits = computed(() => String(run.progress?.total ?? 0).length)
 
 const SCAN = new Set(['upscaling', 'transfer'])
 
+/* The finished result opens the same viewer as the history rail, on this image, so the user can
+   compare it with earlier ones and reach backfill, download and copy without opening the rail.
+   A full history stops keeping new records; then the viewer shows this one image on its own. */
+const viewing = ref(null) // { inHistory, index, entries }
+const resultBtn = ref(null)
+function openResult() {
+  const url = run.currentImage
+  const index = history.entries.findIndex((e) => e.images?.[0] === url)
+  if (index >= 0) return (viewing.value = { inHistory: true, index })
+  const last = run.lastRun ?? { workflowId: catalog.workflowId, params: catalog.params }
+  viewing.value = {
+    inHistory: false,
+    index: 0,
+    entries: [{ ...last, promptId: run.promptId ?? 'current', images: [url], finishedAt: new Date().toISOString() }],
+  }
+}
+function closeResult() {
+  viewing.value = null
+  nextTick(() => resultBtn.value?.focus())
+}
+
 // First-visit guide: gone for good once this session has any result, or while anything else occupies the stage
 const showGuide = computed(() =>
   !run.busy && !run.currentImage && !run.lastOutcome && catalog.workflows.length > 0 && history.entries.length === 0,
@@ -123,13 +145,26 @@ watch(
         style="background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 88%, black)); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05)"
       >
         <div class="relative h-full w-full overflow-hidden border border-hairline bg-plate-bg">
-          <img
+          <button
             v-if="finalOn"
-            :key="run.currentImage"
-            :src="run.currentImage"
-            class="art-enter h-full w-full object-contain"
-            :alt="t('stage.resultAlt', { width: outputDims.width, height: outputDims.height })"
-          />
+            ref="resultBtn"
+            type="button"
+            class="group/res relative block h-full w-full cursor-zoom-in focus-visible:outline-offset-[-2px]"
+            :aria-label="t('stage.openResult')"
+            @click="openResult"
+          >
+            <img
+              :key="run.currentImage"
+              :src="run.currentImage"
+              class="art-enter h-full w-full object-contain"
+              :alt="t('stage.resultAlt', { width: outputDims.width, height: outputDims.height })"
+            />
+            <!-- Says the image opens; shown on hover or keyboard focus, and always on touch screens where nothing hovers -->
+            <span
+              class="obs-ghost obs-tr pointer-events-none absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-sm border border-hairline text-foreground opacity-0 group-hover/res:opacity-100 group-focus-visible/res:opacity-100 [@media(hover:none)]:opacity-100"
+              aria-hidden="true"
+            ><PhArrowsOutSimple class="h-4 w-4" /></span>
+          </button>
           <!-- Preview frames: each replaces the previous one with no entry animation, which would flicker at several frames a second -->
           <img
             v-else-if="previewOn"
@@ -231,6 +266,15 @@ watch(
         <PhX class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
+
+    <Transition name="viewer">
+      <HistoryViewer
+        v-if="viewing"
+        :entries="viewing.inHistory ? history.entries : viewing.entries"
+        :start-index="viewing.index"
+        @close="closeResult"
+      />
+    </Transition>
   </main>
 </template>
 

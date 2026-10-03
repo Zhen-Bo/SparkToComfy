@@ -89,6 +89,7 @@ export default {
     upscaling: '放大中',
     outputting: '输出中',
     resultAlt: '生成结果预览：{width} × {height}',
+    openResult: '在查看器打开这张结果',
     previewAlt: '生成预览帧',
     done: '生成完成',
     failed: '本次生成失败：{reason}',

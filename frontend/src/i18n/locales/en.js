@@ -89,6 +89,7 @@ export default {
     upscaling: 'Upscaling',
     outputting: 'Finalizing',
     resultAlt: 'Generated result: {width} × {height}',
+    openResult: 'Open this result in the viewer',
     previewAlt: 'Generation preview frame',
     done: 'Generation complete',
     failed: 'This run failed: {reason}',

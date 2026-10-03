@@ -90,6 +90,7 @@ export default {
     upscaling: '放大中',
     outputting: '輸出中',
     resultAlt: '生成結果預覽：{width} × {height}',
+    openResult: '在檢視器打開這張結果',
     previewAlt: '生成預覽影格',
     done: '生成完成',
     failed: '本次生成失敗：{reason}',

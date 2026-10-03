@@ -28,9 +28,11 @@ function closeViewer() {
 
 const sheetRef = ref(null)
 const sheetOpen = ref(false)
+// Captured before the stage sees it: with the drawer open, a tap above it only closes the drawer and never opens the result
 function onStageTap(e) {
   const s = sheetRef.value
   if (!s?.expanded || s.el?.contains(e.target)) return
+  e.stopPropagation()
   s.collapse()
 }
 </script>
@@ -58,7 +60,7 @@ function onStageTap(e) {
     </header>
 
     <!-- The bottom padding keeps the stage's status bars above the collapsed strip; overflow-hidden clips the collapsed sheet off the generate row -->
-    <div class="relative min-h-0 flex-1 overflow-hidden" :style="{ paddingBottom: `${(sheetRef?.stripH || 21) + 1}px` }" @click="onStageTap">
+    <div class="relative min-h-0 flex-1 overflow-hidden" :style="{ paddingBottom: `${(sheetRef?.stripH || 21) + 1}px` }" @click.capture="onStageTap">
       <StagePlate class="h-full" compact />
       <div
         class="pointer-events-none absolute inset-0 z-20 backdrop-blur-sm transition-opacity duration-300"
