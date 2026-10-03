@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, onUpdated, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { PhTrash } from '@phosphor-icons/vue'
 import { LORA_MAX, catalog, selectWorkflow, workflow } from '@/stores/catalog'
@@ -78,6 +78,30 @@ const openExpand = (name, e) => {
 watch(expanded, (v) => {
   if (!v) nextTick(() => opener?.focus())
 })
+
+/* Fade whichever edge still has fields beyond it, so a short window shows the panel goes on.
+   Re-measured on scroll and whenever the scroller or any of its sections changes size (tab switch, growing textarea). */
+const port = ref(null)
+const edges = reactive({ top: true, bottom: true, gutter: 0 })
+const EDGE_SLACK = 2 // px; fractional scroll positions never quite reach the end
+function measureEdges() {
+  const el = port.value
+  if (!el) return
+  edges.top = el.scrollTop <= EDGE_SLACK
+  edges.bottom = el.scrollTop + el.clientHeight >= el.scrollHeight - EDGE_SLACK
+  edges.gutter = el.offsetWidth - el.clientWidth
+}
+const portRo = new ResizeObserver(measureEdges)
+// The section set changes with the tab, so the observed list is rebuilt after every render
+function observePort() {
+  const el = port.value
+  if (!el) return
+  portRo.disconnect()
+  for (const node of [el, ...el.children]) portRo.observe(node)
+}
+onMounted(observePort)
+onUpdated(observePort)
+onUnmounted(() => portRo.disconnect())
 const decimalsOf = (ctl) => (ctl.valueKind === 'int' ? 0 : String(ctl.step).split('.')[1]?.length ?? 1)
 const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
 </script>
@@ -85,9 +109,13 @@ const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
 <template>
   <PanelTabs v-model="tab" id-base="panel" :dirty="dirtyTabs" :inert="!connection.comfyOnline || null" />
 
+  <!-- The fades sit outside the scroller so they stay pinned to its edges and leave the scrollbar uncovered -->
+  <div class="relative flex min-h-0 flex-1 flex-col">
   <div
+    ref="port"
     class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-2"
     data-fieldport
+    @scroll.passive="measureEdges"
     role="tabpanel"
     :id="`panel-tabpanel-${tab}`"
     :aria-labelledby="`panel-tab-${tab}`"
@@ -193,6 +221,19 @@ const fmt = (v, ctl) => Number(v ?? 0).toFixed(decimalsOf(ctl))
         {{ lenOf(name) >= ctl.maxLength ? t('panel.countAtLimit', { max: ctl.maxLength }) : '' }}
       </span>
     </section>
+  </div>
+  <div
+    class="pointer-events-none transition-opacity duration-200 absolute left-0 top-0 h-5 bg-gradient-to-b from-[hsl(var(--plate))] to-transparent"
+    :class="edges.top && 'opacity-0'"
+    :style="{ right: `${edges.gutter}px` }"
+    aria-hidden="true"
+  />
+  <div
+    class="pointer-events-none transition-opacity duration-200 absolute bottom-0 left-0 h-8 bg-gradient-to-t from-[hsl(var(--plate))] to-transparent"
+    :class="edges.bottom && 'opacity-0'"
+    :style="{ right: `${edges.gutter}px` }"
+    aria-hidden="true"
+  />
   </div>
 
   <Dialog :open="clearLorasOpen" max-width="340px" content-class="p-5" @update:open="clearLorasOpen = $event">
