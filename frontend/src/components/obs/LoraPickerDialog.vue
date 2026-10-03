@@ -146,9 +146,9 @@ onBeforeUnmount(hidePreview)
           </button>
         </div>
       </section>
-      <aside ref="sidebar" class="lora-mix" tabindex="-1" :aria-label="t('lora.picker.onlySelected')" >
+      <aside ref="sidebar" class="lora-mix" tabindex="-1" :aria-label="t('lora.picker.mixTitle')">
         <div class="lora-mix-heading">
-          <h3>{{ t('lora.picker.onlySelected') }}</h3>
+          <h3>{{ t('lora.picker.mixTitle') }}</h3>
           <button type="button" class="lora-clear-desktop obs-tr min-h-8 rounded-md border border-destructive/60 bg-transparent px-2 py-1 text-[12px] text-destructive hover:enabled:bg-destructive/10 active:enabled:scale-95 disabled:cursor-not-allowed disabled:opacity-40 max-[760px]:min-h-10" :disabled="!sel.length" @click="clearSelection">{{ t('lora.picker.clearAll') }}</button>
         </div>
         <div class="lora-mix-list" @scroll.passive="hidePreview">

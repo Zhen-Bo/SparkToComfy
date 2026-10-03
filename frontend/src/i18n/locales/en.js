@@ -129,7 +129,8 @@ export default {
     cover: '{name} cover',
     copiedName: 'Name copied: {name}',
     picker: {
-      onlySelected: 'Selected LoRAs',
+      onlySelected: 'Selected only',
+      mixTitle: 'Adjust strength',
       showAll: 'Show all LoRAs',
       cancel: 'Cancel',
       limit: 'Limit reached. Remove one to choose another.',

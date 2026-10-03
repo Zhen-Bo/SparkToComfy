@@ -130,7 +130,8 @@ export default {
     cover: '{name} 封面',
     copiedName: '已複製名稱：{name}',
     picker: {
-      onlySelected: '已選 LoRA',
+      onlySelected: '只看已選',
+      mixTitle: '調整強度',
       showAll: '顯示全部 LoRA',
       cancel: '取消',
       limit: '已達上限，移除一個即可更換',

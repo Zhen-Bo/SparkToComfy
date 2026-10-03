@@ -129,7 +129,8 @@ export default {
     cover: '{name} 封面',
     copiedName: '已复制名称：{name}',
     picker: {
-      onlySelected: '已选 LoRA',
+      onlySelected: '只看已选',
+      mixTitle: '调整强度',
       showAll: '显示全部 LoRA',
       cancel: '取消',
       limit: '已达上限，移除一个即可更换',
