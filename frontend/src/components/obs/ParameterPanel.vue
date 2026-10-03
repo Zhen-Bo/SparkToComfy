@@ -12,24 +12,24 @@ const { t } = useI18n()
 
 <template>
   <aside class="obs-panel flex min-h-0 flex-col border-r border-hairline" :aria-label="t('panel.aria')">
-    <div class="border-b border-hairline px-5 pb-3.5 pt-5">
-      <div class="flex items-start justify-between gap-3">
+    <div class="flex items-center justify-between gap-3 border-b border-hairline px-5 py-4">
+      <div class="flex min-w-0 items-center gap-2.5">
         <h1 class="font-disp text-[18px] tracking-[.12em]" translate="no"><span class="text-foreground">Spark</span><span class="text-amber-bright">To</span><span class="text-foreground">Comfy</span></h1>
-        <ThemeSwitcher />
-      </div>
-      <p class="mt-1.5 flex" role="status">
-        <span
-          class="flex items-center gap-1 rounded-sm border px-1.5 py-px font-sans text-[11px] font-bold tracking-[.12em]"
-          :class="connection.comfyOnline ? 'border-amber-dim text-amber' : 'border-destructive/60 text-destructive'"
-        >
+        <p class="flex" role="status">
           <span
-            class="inline-block h-1 w-1 rounded-full"
-            :class="connection.comfyOnline ? 'bg-amber' : 'animate-pulse bg-destructive'"
-            aria-hidden="true"
-          />
-          {{ t(connection.comfyOnline ? 'offline.badge.online' : 'offline.badge.offline') }}
-        </span>
-      </p>
+            class="flex items-center gap-1 whitespace-nowrap rounded-sm border px-1.5 py-px font-sans text-[11px] font-bold tracking-[.12em]"
+            :class="connection.comfyOnline ? 'border-amber-dim text-amber' : 'border-destructive/60 text-destructive'"
+          >
+            <span
+              class="inline-block h-1 w-1 rounded-full"
+              :class="connection.comfyOnline ? 'bg-amber' : 'animate-pulse bg-destructive'"
+              aria-hidden="true"
+            />
+            {{ t(connection.comfyOnline ? 'offline.badge.online' : 'offline.badge.offline') }}
+          </span>
+        </p>
+      </div>
+      <ThemeSwitcher />
     </div>
 
     <!-- Keep the header outside the offline mask; covered controls also need inert to block keyboard access. -->

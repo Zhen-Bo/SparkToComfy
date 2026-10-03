@@ -2,6 +2,8 @@
 export default {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{vue,js}'],
+  // A tap on a touch screen would otherwise leave hover: styles stuck on the last tapped element
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
@@ -89,5 +91,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // A phone turned sideways: the mobile layout still applies, but height is the scarce side.
+    // A variant rather than a raw screen, which would switch off the arbitrary max-[...] variants used across the app.
+    ({ addVariant }) => addVariant('short', '@media (max-height: 500px)'),
+  ],
 }

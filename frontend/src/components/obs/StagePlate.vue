@@ -1,10 +1,13 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { catalog, currentDims, outputDims } from '@/stores/catalog'
 import { dismissOutcome, queueEta, retryLastRun, run } from '@/stores/run'
+import { history } from '@/stores/history'
+import { MOD_KEY } from '@/lib/shortcut'
 import QueueSlots from '@/components/obs/QueueSlots.vue'
-import { PhX } from '@phosphor-icons/vue'
+import HistoryViewer from '@/components/obs/HistoryViewer.vue'
+import { PhArrowsOutSimple, PhX } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
 
@@ -65,6 +68,32 @@ const stepDigits = computed(() => String(run.progress?.total ?? 0).length)
 
 const SCAN = new Set(['upscaling', 'transfer'])
 
+/* The finished result opens the same viewer as the history rail, on this image, so the user can
+   compare it with earlier ones and reach backfill, download and copy without opening the rail.
+   A full history stops keeping new records; then the viewer shows this one image on its own. */
+const viewing = ref(null) // { inHistory, index, entries }
+const resultBtn = ref(null)
+function openResult() {
+  const url = run.currentImage
+  const index = history.entries.findIndex((e) => e.images?.[0] === url)
+  if (index >= 0) return (viewing.value = { inHistory: true, index })
+  const last = run.lastRun ?? { workflowId: catalog.workflowId, params: catalog.params }
+  viewing.value = {
+    inHistory: false,
+    index: 0,
+    entries: [{ ...last, promptId: run.promptId ?? 'current', images: [url], finishedAt: new Date().toISOString() }],
+  }
+}
+function closeResult() {
+  viewing.value = null
+  nextTick(() => resultBtn.value?.focus())
+}
+
+// First-visit guide: gone for good once this session has any result, or while anything else occupies the stage
+const showGuide = computed(() =>
+  !run.busy && !run.currentImage && !run.lastOutcome && catalog.workflows.length > 0 && history.entries.length === 0,
+)
+
 const scanning = computed(() => SCAN.has(run.phase))
 const upscaling = computed(() => run.phase !== 'transfer' && Number(catalog.params.upscale) > 1)
 const scanLabel = computed(() =>
@@ -116,13 +145,26 @@ watch(
         style="background: linear-gradient(180deg, hsl(var(--elevated)), color-mix(in srgb, hsl(var(--elevated)) 88%, black)); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05)"
       >
         <div class="relative h-full w-full overflow-hidden border border-hairline bg-plate-bg">
-          <img
+          <button
             v-if="finalOn"
-            :key="run.currentImage"
-            :src="run.currentImage"
-            class="art-enter h-full w-full object-contain"
-            :alt="t('stage.resultAlt', { width: outputDims.width, height: outputDims.height })"
-          />
+            ref="resultBtn"
+            type="button"
+            class="group/res relative block h-full w-full cursor-zoom-in focus-visible:outline-offset-[-2px]"
+            :aria-label="t('stage.openResult')"
+            @click="openResult"
+          >
+            <img
+              :key="run.currentImage"
+              :src="run.currentImage"
+              class="art-enter h-full w-full object-contain"
+              :alt="t('stage.resultAlt', { width: outputDims.width, height: outputDims.height })"
+            />
+            <!-- Says the image opens; shown on hover or keyboard focus, and always on touch screens where nothing hovers -->
+            <span
+              class="obs-ghost obs-tr pointer-events-none absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-sm border border-hairline text-foreground opacity-0 group-hover/res:opacity-100 group-focus-visible/res:opacity-100 [@media(hover:none)]:opacity-100"
+              aria-hidden="true"
+            ><PhArrowsOutSimple class="h-4 w-4" /></span>
+          </button>
           <!-- Preview frames: each replaces the previous one with no entry animation, which would flicker at several frames a second -->
           <img
             v-else-if="previewOn"
@@ -148,6 +190,28 @@ watch(
         <div class="absolute -left-3.5 -right-3.5 top-1/2 h-px" style="background: linear-gradient(to right, transparent, hsl(var(--amber) / .35) 30%, hsl(var(--amber) / .35) 70%, transparent)" />
       </div>
     </div>
+    <!-- Anchored to the stage, not the frame, so a small frame (a sideways phone, a tall preset) never squeezes the text.
+         The frame is centred in the stage, so the stage centre is the crosshair centre. The crosshair lines are 1px
+         wide and start at that centre, so their own centre is half a pixel past it: the text is offset to match.
+         Each line is placed on its own, 8px clear of the horizontal line above and below, so that line runs exactly
+         through the gap; each backing hides the vertical line where it crosses the text. A single line sits on the centre. -->
+    <Transition name="guide">
+      <div v-if="showGuide" class="pointer-events-none absolute inset-0 z-10">
+        <span
+          class="absolute left-[calc(50%+.5px)] w-max max-w-[90%] -translate-x-1/2 rounded-sm bg-plate-bg/90 px-2.5 py-1 text-center text-[13px] leading-snug text-muted-foreground"
+          :class="props.compact ? 'top-[calc(50%+.5px)] -translate-y-1/2' : 'bottom-[calc(50%+8px)]'"
+        >{{ t(props.compact ? 'stage.guideMobile' : 'stage.guide') }}</span>
+        <span
+          v-if="!props.compact"
+          class="absolute left-[calc(50%+.5px)] top-[calc(50%+9px)] flex w-max -translate-x-1/2 items-center gap-1.5 rounded-sm bg-plate-bg/90 px-2.5 py-1 text-[11px] text-ink-faint"
+        >
+          <kbd class="rounded-[3px] border border-hairline px-1.5 py-px font-mono text-[11px] text-muted-foreground" translate="no">{{ MOD_KEY.label }}</kbd>
+          <span aria-hidden="true">+</span>
+          <kbd class="rounded-[3px] border border-hairline px-1.5 py-px font-mono text-[11px] text-muted-foreground" translate="no">Enter</kbd>
+          <span>{{ t('stage.guideShortcut') }}</span>
+        </span>
+      </div>
+    </Transition>
     </div>
 
     <div
@@ -202,6 +266,15 @@ watch(
         <PhX class="h-3.5 w-3.5" aria-hidden="true" />
       </button>
     </div>
+
+    <Transition name="viewer">
+      <HistoryViewer
+        v-if="viewing"
+        :entries="viewing.inHistory ? history.entries : viewing.entries"
+        :start-index="viewing.index"
+        @close="closeResult"
+      />
+    </Transition>
   </main>
 </template>
 
@@ -224,6 +297,10 @@ watch(
 
 .upsbar { animation: upsBarIn .3s var(--ease-fluid) both; }
 @keyframes upsBarIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.guide-enter-active { transition: opacity .3s var(--ease-fluid); }
+.guide-leave-active { transition: opacity .15s ease-out; }
+.guide-enter-from, .guide-leave-to { opacity: 0; }
 
 .art-enter { animation: artIn .26s var(--ease-fluid) both; }
 @keyframes artIn {

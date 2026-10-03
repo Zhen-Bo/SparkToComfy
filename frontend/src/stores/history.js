@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { clearHistory as clearHistoryApi, fetchHistory } from '@/api/comfy'
+import { clearHistory as clearHistoryApi, deleteHistoryEntry as deleteEntryApi, fetchHistory } from '@/api/comfy'
 import { INTL_LOCALE, i18n } from '@/i18n'
 import { catalog, sizeOf } from '@/stores/catalog'
 import { errorText, notify, notifyError } from '@/stores/notify'
@@ -28,16 +28,19 @@ export async function refreshHistory() {
   }
 }
 
+// Deep copy through JSON: reactive proxies make structuredClone throw, and parameters are JSON data to begin with.
+const clone = (value) => JSON.parse(JSON.stringify(value))
+
 // Guard every caller against changing the workflow and frame dimensions during a run.
 export function restoreFromHistory(entry) {
   if (run.busy) return notifyError(t('notify.restoreBusy'))
   if (!catalog.workflows.some((w) => w.id === entry.workflowId)) {
     return notifyError(t('notify.workflowGone'))
   }
+  const before = clone({ workflowId: catalog.workflowId, params: catalog.params, restoredBaseline: catalog.restoredBaseline })
   catalog.workflowId = entry.workflowId
-  // Deep copy through JSON: entry is a reactive proxy and structuredClone rejects proxies, while params is JSON data to begin with.
-  catalog.params = { ...JSON.parse(JSON.stringify(entry.params)), seed: Number(entry.params.seed) }
-  catalog.restoredBaseline = JSON.parse(JSON.stringify(catalog.params))
+  catalog.params = { ...clone(entry.params), seed: Number(entry.params.seed) }
+  catalog.restoredBaseline = clone(catalog.params)
   const d = sizeOf(entry.workflowId, entry.params.size)
   notify(
     t('notify.restored', {
@@ -47,7 +50,14 @@ export function restoreFromHistory(entry) {
       steps: catalog.params.steps,
       cfg: catalog.params.cfg,
     }),
+    { label: t('notify.undo'), run: () => undoRestore(before) },
   )
+}
+
+function undoRestore(before) {
+  if (run.busy) return notifyError(t('notify.undoBusy'))
+  Object.assign(catalog, before)
+  notify(t('notify.restoreUndone'))
 }
 
 export async function clearHistory() {
@@ -58,5 +68,18 @@ export async function clearHistory() {
   } catch (err) {
     console.error('[history] failed to clear', err)
     notifyError(t('notify.historyClearFailed', { reason: errorText(err.code) }))
+  }
+}
+
+export async function deleteHistoryEntry(promptId) {
+  try {
+    await deleteEntryApi(promptId)
+    history.entries = history.entries.filter((e) => e.promptId !== promptId)
+    notify(t('notify.entryDeleted'))
+    return true
+  } catch (err) {
+    console.error('[history] failed to delete entry', err)
+    notifyError(t('notify.entryDeleteFailed', { reason: errorText(err.code) }))
+    return false
   }
 }

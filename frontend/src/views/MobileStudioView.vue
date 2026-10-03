@@ -9,6 +9,7 @@ import StagePlate from '@/components/obs/StagePlate.vue'
 import MobileSheet from '@/components/obs/MobileSheet.vue'
 import GenerateButton from '@/components/obs/GenerateButton.vue'
 import HistoryViewer from '@/components/obs/HistoryViewer.vue'
+import ThemeSwitcher from '@/components/obs/ThemeSwitcher.vue'
 import { PhClockCounterClockwise } from '@phosphor-icons/vue'
 
 const { t } = useI18n()
@@ -27,17 +28,20 @@ function closeViewer() {
 
 const sheetRef = ref(null)
 const sheetOpen = ref(false)
+// Captured before the stage sees it: with the drawer open, a tap above it only closes the drawer and never opens the result
 function onStageTap(e) {
   const s = sheetRef.value
   if (!s?.expanded || s.el?.contains(e.target)) return
+  e.stopPropagation()
   s.collapse()
 }
 </script>
 
 <template>
   <div class="obs-grain flex h-dvh flex-col overflow-hidden">
-    <header class="obs-panel flex flex-none items-center justify-between gap-3 border-b border-hairline px-4 py-[21px]">
+    <header class="obs-panel flex flex-none items-center justify-between gap-3 border-b border-hairline px-4 py-[21px] short:py-2">
       <h1 class="font-disp text-[18px] tracking-[.12em]" translate="no"><span class="text-foreground">Spark</span><span class="text-amber-bright">To</span><span class="text-foreground">Comfy</span></h1>
+      <div class="flex items-center gap-3">
       <p role="status">
         <span
           class="flex items-center gap-1 rounded-sm border px-1.5 py-px font-sans text-[11px] font-bold tracking-[.12em]"
@@ -51,10 +55,12 @@ function onStageTap(e) {
           {{ t(connection.comfyOnline ? 'offline.badge.online' : 'offline.badge.offline') }}
         </span>
       </p>
+      <ThemeSwitcher />
+      </div>
     </header>
 
     <!-- The bottom padding keeps the stage's status bars above the collapsed strip; overflow-hidden clips the collapsed sheet off the generate row -->
-    <div class="relative min-h-0 flex-1 overflow-hidden pb-[22px]" @click="onStageTap">
+    <div class="relative min-h-0 flex-1 overflow-hidden" :style="{ paddingBottom: `${(sheetRef?.stripH || 21) + 1}px` }" @click.capture="onStageTap">
       <StagePlate class="h-full" compact />
       <div
         class="pointer-events-none absolute inset-0 z-20 backdrop-blur-sm transition-opacity duration-300"
@@ -66,12 +72,13 @@ function onStageTap(e) {
     </div>
 
     <!-- The output-size readout is pinned here instead of riding the sheet's strip, so opening the drawer never carries it upward -->
-    <footer class="obs-panel flex-none px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
-      <p class="mb-2 flex items-baseline justify-between">
+    <!-- On a sideways phone the readout moves beside the buttons, giving its row's height back to the stage -->
+    <footer class="obs-panel flex-none px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5 short:flex short:items-center short:gap-4 short:pb-[max(8px,env(safe-area-inset-bottom))] short:pt-2">
+      <p class="mb-2 flex items-baseline justify-between short:mb-0 short:flex-none short:flex-col short:items-start short:gap-0.5">
         <span class="text-[11px] tracking-[.1em] text-muted-foreground">{{ t('panel.outputSize') }}</span>
         <span class="font-mono text-[14px] font-semibold text-amber-bright tabular-nums" translate="no">{{ dimsKnown ? `${outputDims.width} × ${outputDims.height}` : '—' }}</span>
       </p>
-      <div class="flex items-stretch gap-2.5">
+      <div class="flex items-stretch gap-2.5 short:flex-1">
         <!-- Keep history browsing available while Comfy is offline. -->
         <div class="min-h-12 flex-1" :inert="!connection.comfyOnline || null">
           <GenerateButton class="h-full w-full" />
