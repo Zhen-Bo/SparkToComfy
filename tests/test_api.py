@@ -64,10 +64,10 @@ def test_workflow_size_presets(workflows):
 def test_example_model_dropdown(workflows):
     model = workflows[0]["parameters"]["basic"]["model"]
     assert model["type"] == "dropdown", model
-    assert model["options"]["krea2Turbo_v10_fp8.safetensors"] == {
+    assert model["options"][r"krea2\krea2Turbo_v10_fp8.safetensors"] == {
         "label": "Krea2 Turbo FP8"
     }, model
-    bf16 = model["options"]["krea2Turbo_v10_bf16.safetensors"]
+    bf16 = model["options"][r"krea2\krea2Turbo_v10_bf16.safetensors"]
     assert bf16 == {"label": "Krea2 Turbo", "disabled": True}, bf16
 
 
@@ -160,7 +160,10 @@ async def test_generate_rejects_disabled_model(client, example_values):
         json={
             "workflowId": "example",
             "sessionId": sid,
-            "params": {**example_values, "model": "krea2Turbo_v10_bf16.safetensors"},
+            "params": {
+                **example_values,
+                "model": r"krea2\krea2Turbo_v10_bf16.safetensors",
+            },
         },
     )
     body = resp.json()

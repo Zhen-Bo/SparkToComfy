@@ -31,7 +31,7 @@ def example_registry():
 # --- valid parameters ---
 
 EXAMPLE_VALUES = {
-    "model": "krea2Turbo_v10_fp8.safetensors",
+    "model": r"krea2\krea2Turbo_v10_fp8.safetensors",
     "quality": "",
     "positive": "a cat",
     "negative": "",

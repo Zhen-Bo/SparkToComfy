@@ -45,12 +45,12 @@ basic:
         target: unet_name
         type: dropdown
         options:
-            krea2Turbo_v10_fp8.safetensors:
+            krea2\krea2Turbo_v10_fp8.safetensors:
                 label: Krea2 Turbo FP8
-            krea2Turbo_v10_bf16.safetensors:
+            krea2\krea2Turbo_v10_bf16.safetensors:
                 label: Krea2 Turbo
                 disabled: true
-        default: krea2Turbo_v10_fp8.safetensors
+        default: krea2\krea2Turbo_v10_fp8.safetensors
 
     # max_length is enforced server-side, not just in the textarea.
     quality:
@@ -161,6 +161,7 @@ advanced:
             step: 0.05
             default: 1
         options:
+            R9FG018QZ03G8N8C4JKMMKCJA0: KMJ style lora
             Ps_Special_Merge_for_Krea2-v1: Ps Special Merge Style
             Ps_gpt2-style_v3-krea2: Ps GPT-image-2 style
             Krea2_TextFusion_Refusal_Reduction: TextFusion Refusal-Reduction
