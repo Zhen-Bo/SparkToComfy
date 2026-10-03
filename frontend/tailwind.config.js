@@ -91,5 +91,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // A phone turned sideways: the mobile layout still applies, but height is the scarce side.
+    // A variant rather than a raw screen, which would switch off the arbitrary max-[...] variants used across the app.
+    ({ addVariant }) => addVariant('short', '@media (max-height: 500px)'),
+  ],
 }
