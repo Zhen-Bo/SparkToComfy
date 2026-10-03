@@ -144,7 +144,7 @@ SERVER__DOCS=true uv run uvicorn app.main:app --reload
 | `server.host` | `0.0.0.0` | The host the application binds to |
 | `server.port` | `8000` | The port the application binds to |
 | `server.database` | `data/comfypanel.db` | Where the database lives |
-| `server.docs` | `false` | Switch for `/docs`, `/redoc` and `/openapi.json` |
+| `server.docs` | `false` | Switch for `/v1/docs`, `/v1/redoc` and `/v1/openapi.json` |
 | `server.log_level` | `INFO` | Log verbosity; `DEBUG` also prints rejected prompts and invalid request bodies |
 | `server.log_format` | `console` | `console` for people, `json` for a log collector, one object per line |
 | `comfyui.url` | `http://127.0.0.1:8188` | Where the ComfyUI API runs |

@@ -1,5 +1,6 @@
-# Injected into every size control at load time.
-# Landscape swaps width/height; do not add separate landscape presets.
+# Size presets, shared by every workflow: a `size` control declares no presets of its own and is given these at load time.
+# Each ratio carries two resolutions, and the panel's landscape toggle swaps width and height rather than adding more entries.
+# `icon` picks the glyph the ratio button draws.
 presets:
     square:
         label: "1:1"
