@@ -236,7 +236,9 @@ function onCancelClear() {
 .entry-off { opacity: 0; transform: scale(.9); pointer-events: none; transition-delay: 0s; transition-duration: .12s; }
 
 .head-caret { transition: transform .16s var(--ease-fluid); }
-.head-btn:hover .head-caret { transform: translateX(2px); }
+@media (hover: hover) {
+  .head-btn:hover .head-caret { transform: translateX(2px); }
+}
 
 .hist-enter-active { transition: opacity .3s var(--ease-fluid), transform .3s var(--ease-fluid); }
 .hist-enter-from   { opacity: 0; transform: translateY(-6px); }

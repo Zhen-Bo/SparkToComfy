@@ -245,8 +245,10 @@ onBeforeUnmount(hidePreview)
 .lora-footer p { font-size: 13px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .lora-footer>div { display: flex; gap: 12px; margin-inline-start: auto; }
 .lora-confirm { padding-inline: 24px; border-color: hsl(var(--amber)); color: hsl(var(--amber)); font-family: 'Chakra Petch', 'Taipei Sans TC', sans-serif; }
-.lora-confirm:hover { background: hsl(var(--amber) / .1); color: hsl(var(--amber-bright)); }
-.lora-secondary:hover { background: hsl(var(--elevated)); }
+@media (hover: hover) {
+  .lora-confirm:hover { background: hsl(var(--amber) / .1); color: hsl(var(--amber-bright)); }
+  .lora-secondary:hover { background: hsl(var(--elevated)); }
+}
 @media (max-width: 760px) {
   :global(.lora-picker) { padding: 12px; height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .lora-layout { display: flex; flex-direction: column; overflow: hidden; }

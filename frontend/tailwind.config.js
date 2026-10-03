@@ -2,6 +2,8 @@
 export default {
   darkMode: ['class'],
   content: ['./index.html', './src/**/*.{vue,js}'],
+  // A tap on a touch screen would otherwise leave hover: styles stuck on the last tapped element
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
