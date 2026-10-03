@@ -7,6 +7,8 @@ const { t } = useI18n()
 
 const props = defineProps({
   count: { type: Number, required: true },
+  // Deleting one image reuses the same confirmation with its own wording
+  single: { type: Boolean, default: false },
 })
 const emit = defineEmits(['confirm', 'cancel'])
 
@@ -40,9 +42,10 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           aria-labelledby="chd-title"
           aria-describedby="chd-desc"
         >
-          <div id="chd-title" class="font-sans text-[13.5px] font-bold tracking-[.06em] text-foreground">{{ t('history.clear.title') }}</div>
+          <div id="chd-title" class="font-sans text-[13.5px] font-bold tracking-[.06em] text-foreground">{{ t(single ? 'history.remove.title' : 'history.clear.title') }}</div>
           <p id="chd-desc" class="mt-2 font-sans text-[12px] leading-[1.8] text-muted-foreground">
-            <i18n-t scope="global" keypath="history.clear.desc">
+            <template v-if="single">{{ t('history.remove.desc') }}</template>
+            <i18n-t v-else scope="global" keypath="history.clear.desc">
               <template #count><span class="font-mono tabular-nums text-amber-bright" translate="no">{{ count }}</span></template>
             </i18n-t>
           </p>
@@ -58,7 +61,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
               type="button"
               class="obs-tr h-7 cursor-pointer rounded-sm border border-destructive/70 px-3.5 font-sans text-[11.5px] font-bold tracking-[.08em] text-destructive hover:border-destructive hover:bg-destructive/15 active:scale-95"
               @click="emit('confirm')"
-            >{{ t('history.clear.confirm') }}</button>
+            >{{ t(single ? 'history.remove.confirm' : 'history.clear.confirm') }}</button>
           </div>
         </div>
       </div>

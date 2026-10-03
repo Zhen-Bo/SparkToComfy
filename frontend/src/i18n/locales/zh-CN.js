@@ -160,7 +160,14 @@ export default {
     expand: '展开历史纪录栏',
     expandUnread: '展开历史纪录栏・{n} 张新图',
     collapse: '收合历史纪录栏',
+    resize: '拖拽调整历史栏宽度，双击恢复默认',
     viewAt: '放大查看第 {n}/{total} 张历史图（{time}）',
+    remove: {
+      aria: '删除第 {n} 张历史图（{time}）',
+      title: '删除这张图片',
+      desc: '将从历史栏移除这张图片，此操作无法撤销。',
+      confirm: '确认删除',
+    },
     clear: {
       title: '清除全部历史纪录',
       desc: '将从历史栏移除全部 {count} 张图片，此操作无法复原。',
@@ -190,6 +197,8 @@ export default {
     historyLoadFailed: '历史读取失败：{reason}',
     restored: '已回填全部参数：SEED {seed} ・ {width}×{height} ・ {steps} 步 ・ CFG {cfg}',
     cleared: '已清除全部历史纪录',
+    entryDeleted: '已删除这张图片',
+    entryDeleteFailed: '删除失败：{reason}',
     undo: '撤销',
     restoreUndone: '已撤销回填，参数恢复原状',
     undoBusy: '撤销失败：生成中不能更动参数',

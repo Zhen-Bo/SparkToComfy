@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { clearHistory, history, timeOf } from '@/stores/history'
+import { clearHistory, deleteHistoryEntry, history, timeOf } from '@/stores/history'
 import { cn } from '@/lib/utils'
 import { PhCaretDoubleRight, PhTrash, PhClockCounterClockwise } from '@phosphor-icons/vue'
 import HistoryViewer from '@/components/obs/HistoryViewer.vue'
@@ -93,13 +93,95 @@ function onCancelClear() {
   confirming.value = false
   nextTick(() => clearBtn.value?.focus())
 }
+
+/* Width: one column by default, so each thumbnail is as large as the rail allows.
+   Dragging the left edge widens it; from 1.5 times the default the grid switches to two columns.
+   The stage keeps its 520px minimum, and the chosen width is remembered per browser. */
+const RAIL_MIN = 264
+const RAIL_MAX = 560
+const STAGE_MIN = 364 + 520 // the parameter column plus the smallest useful stage
+const WIDTH_KEY = 'comfy.historyRailWidth'
+const maxWidth = () => Math.max(RAIL_MIN, Math.min(RAIL_MAX, window.innerWidth - STAGE_MIN))
+const clampWidth = (w) => Math.round(Math.min(Math.max(w, RAIL_MIN), maxWidth()))
+const readWidth = () => {
+  try { return Number(localStorage.getItem(WIDTH_KEY)) || RAIL_MIN } catch { return RAIL_MIN }
+}
+const railWidth = ref(clampWidth(readWidth()))
+const TWO_COLUMNS_AT = RAIL_MIN * 1.5 // 396px
+const columns = computed(() => (railWidth.value >= TWO_COLUMNS_AT ? 2 : 1))
+const resizing = ref(false)
+function saveWidth() {
+  try { localStorage.setItem(WIDTH_KEY, String(railWidth.value)) } catch { /* storage blocked: width lasts this visit */ }
+}
+let dragFrom = null
+function onResizeDown(e) {
+  if (e.button !== 0) return
+  e.currentTarget.setPointerCapture(e.pointerId)
+  dragFrom = { x: e.clientX, w: railWidth.value }
+  resizing.value = true
+}
+function onResizeMove(e) {
+  if (!dragFrom) return
+  railWidth.value = clampWidth(dragFrom.w + dragFrom.x - e.clientX) // dragging left widens
+}
+function onResizeUp() {
+  if (!dragFrom) return
+  dragFrom = null
+  resizing.value = false
+  saveWidth()
+}
+const RESIZE_STEP = 24
+const RESIZE_KEYS = {
+  ArrowLeft: (w) => w + RESIZE_STEP,
+  ArrowRight: (w) => w - RESIZE_STEP,
+  Home: () => RAIL_MIN,
+  End: () => RAIL_MAX,
+}
+function onResizeKey(e) {
+  const next = RESIZE_KEYS[e.key]
+  if (!next) return
+  e.preventDefault()
+  railWidth.value = clampWidth(next(railWidth.value))
+  saveWidth()
+}
+// Double-click returns to the single-column default
+function resetWidth() {
+  railWidth.value = RAIL_MIN
+  saveWidth()
+}
+const onWinResize = () => { railWidth.value = clampWidth(railWidth.value) }
+onMounted(() => window.addEventListener('resize', onWinResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onWinResize))
+
+// Single delete: confirm first, then hand focus to the card that slid into its place
+const removing = ref(null) // { promptId, index }
+const cardList = ref(null)
+function askRemove(entry, index) {
+  removing.value = { promptId: entry.promptId, index }
+}
+async function onConfirmRemove() {
+  const { promptId, index } = removing.value
+  removing.value = null
+  const ok = await deleteHistoryEntry(promptId)
+  await nextTick()
+  // Look the card up by id: the deleted one is still in the DOM while it fades out
+  const next = history.entries[ok ? Math.min(index, history.entries.length - 1) : index]
+  const card = next && cardList.value?.$el?.querySelector(`[data-prompt-id="${CSS.escape(next.promptId)}"] .hist-open`)
+  ;(card ?? headEl.value)?.focus()
+}
+function onCancelRemove() {
+  const { index } = removing.value
+  removing.value = null
+  nextTick(() => cardList.value?.$el?.querySelectorAll('.hist-del')[index]?.focus())
+}
 </script>
 
 <template>
   <!-- Animate the clipping width around a fixed-width panel to keep card contents from reflowing. -->
   <aside
     :aria-label="t('history.title')"
-    :class="cn('rail relative flex min-h-0 flex-col', closed ? 'rail-closed w-0' : 'w-[264px]')"
+    :class="cn('rail relative flex min-h-0 flex-col', closed && 'rail-closed', resizing && 'rail-resizing')"
+    :style="{ width: closed ? '0px' : `${railWidth}px` }"
   >
     <img
       v-if="dropping && closed"
@@ -132,9 +214,30 @@ function onCancelClear() {
     <!-- Keep the entry button outside this layer so it survives clipping to zero width. -->
     <div class="absolute inset-0 overflow-hidden">
     <div
-      class="rail-panel obs-panel absolute inset-y-0 right-0 flex w-[264px] flex-col overflow-hidden border-l border-hairline"
+      class="rail-panel obs-panel absolute inset-y-0 right-0 flex flex-col overflow-hidden border-l border-hairline"
+      :style="{ width: `${railWidth}px` }"
       :inert="closed || undefined"
     >
+      <!-- Resize grip on the left edge: a thin hit strip whose line lights up on hover, focus or drag -->
+      <div
+        class="rail-grip absolute inset-y-0 left-0 z-20 w-2 cursor-col-resize touch-none"
+        :class="resizing && 'is-active'"
+        role="separator"
+        aria-orientation="vertical"
+        tabindex="0"
+        :aria-label="t('history.resize')"
+        :title="t('history.resize')"
+        :aria-valuemin="RAIL_MIN"
+        :aria-valuemax="RAIL_MAX"
+        :aria-valuenow="railWidth"
+        @pointerdown="onResizeDown"
+        @pointermove="onResizeMove"
+        @pointerup="onResizeUp"
+        @pointercancel="onResizeUp"
+        @lostpointercapture="onResizeUp"
+        @dblclick="resetWidth"
+        @keydown="onResizeKey"
+      />
       <div ref="headEl" tabindex="-1" class="flex flex-none items-center border-b border-hairline px-2 py-3">
         <button
           type="button"
@@ -159,34 +262,52 @@ function onCancelClear() {
         class="flex-1 px-4 pt-6 text-center font-sans text-[12px] leading-[1.9] text-ink-faint"
       >{{ t('history.empty') }}</p>
 
-      <TransitionGroup v-else tag="div" name="hist" class="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
-        <button
-          v-for="(entry, i) in history.entries"
-          :key="entry.promptId"
-          type="button"
-          class="obs-tr obs-elevated flex-none cursor-pointer rounded-[3px] border border-control p-[3px] hover:border-amber"
-          :aria-label="t('history.viewAt', { n: i + 1, total: history.entries.length, time: timeOf(entry.finishedAt) })"
-          @click="openViewer(i, $event)"
-        >
-          <!-- These URLs serve full-size images, so defer offscreen loads. -->
-          <div class="relative aspect-square w-full overflow-hidden border border-hairline bg-plate-bg">
-            <img
-              :src="entry.images[0]"
-              loading="lazy"
-              decoding="async"
-              alt=""
-              aria-hidden="true"
-              class="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-[16px] brightness-[.45] saturate-[.8]"
-            />
-            <img
-              :src="entry.images[0]"
-              class="relative h-full w-full object-contain"
-              loading="lazy"
-              decoding="async"
-              alt=""
-            />
-          </div>
-        </button>
+      <!-- One column, or two once the rail is 1.5 times its default width. The stable gutter keeps the
+           column width from jumping when the scrollbar appears. -->
+      <TransitionGroup
+        v-else
+        ref="cardList"
+        tag="div"
+        name="hist"
+        class="hist-grid grid flex-1 auto-rows-min content-start overflow-y-auto p-3"
+        :class="columns === 2 ? 'gap-2' : 'gap-3'"
+        :style="{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }"
+      >
+        <div v-for="(entry, i) in history.entries" :key="entry.promptId" class="group relative" :data-prompt-id="entry.promptId">
+          <button
+            type="button"
+            class="hist-open obs-tr obs-elevated block w-full cursor-pointer rounded-[3px] border border-control p-[3px] hover:border-amber"
+            :aria-label="t('history.viewAt', { n: i + 1, total: history.entries.length, time: timeOf(entry.finishedAt) })"
+            @click="openViewer(i, $event)"
+          >
+            <!-- These URLs serve full-size images, so defer offscreen loads. -->
+            <div class="relative aspect-square w-full overflow-hidden border border-hairline bg-plate-bg">
+              <img
+                :src="entry.images[0]"
+                loading="lazy"
+                decoding="async"
+                alt=""
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-0 h-full w-full scale-125 object-cover blur-[16px] brightness-[.45] saturate-[.8]"
+              />
+              <img
+                :src="entry.images[0]"
+                class="relative h-full w-full object-contain"
+                loading="lazy"
+                decoding="async"
+                alt=""
+              />
+            </div>
+          </button>
+          <!-- A sibling, not a child: a button cannot hold another button. Revealed on hover or focus, always shown without hover. -->
+          <button
+            type="button"
+            class="hist-del obs-ghost obs-tr absolute right-1.5 top-1.5 grid h-7 w-7 cursor-pointer place-items-center rounded-sm border border-hairline text-muted-foreground opacity-0 hover:border-destructive/70 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100 active:scale-95 [@media(hover:none)]:opacity-100"
+            :aria-label="t('history.remove.aria', { n: i + 1, time: timeOf(entry.finishedAt) })"
+            :title="t('history.remove.title')"
+            @click="askRemove(entry, i)"
+          ><PhTrash class="h-3.5 w-3.5" aria-hidden="true" /></button>
+        </div>
       </TransitionGroup>
 
       <!-- Keep clear-all away from the entry toggle so a second click after opening cannot hit it. -->
@@ -209,6 +330,9 @@ function onCancelClear() {
       <HistoryViewer v-if="viewIndex !== null" :entries="history.entries" :start-index="viewIndex" @close="closeViewer" />
     </Transition>
     <Transition name="chd">
+      <ClearHistoryDialog v-if="removing" :count="1" single @confirm="onConfirmRemove" @cancel="onCancelRemove" />
+    </Transition>
+    <Transition name="chd">
       <ClearHistoryDialog
         v-if="confirming"
         :count="history.entries.length"
@@ -222,6 +346,21 @@ function onCancelClear() {
 <style scoped>
 .rail { transition: width .22s var(--ease-fluid); }
 .rail-closed { transition-duration: .18s; }
+/* Follow the pointer directly while dragging; the eased width is only for opening and closing */
+.rail-resizing { transition: none; user-select: none; }
+
+.hist-grid { scrollbar-gutter: stable; }
+
+.rail-grip::after {
+  content: ''; position: absolute; inset-block: 0; left: -1px; width: 2px;
+  background: hsl(var(--amber)); opacity: 0; transition: opacity .16s var(--ease-fluid);
+}
+.rail-grip:focus-visible { outline: none; }
+.rail-grip:focus-visible::after,
+.rail-grip.is-active::after { opacity: 1; }
+@media (hover: hover) {
+  .rail-grip:hover::after { opacity: .6; }
+}
 
 /* Isolate the fixed-width card layout from the animated column width. */
 .rail-panel { contain: layout paint; }

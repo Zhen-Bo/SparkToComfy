@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { clearHistory as clearHistoryApi, fetchHistory } from '@/api/comfy'
+import { clearHistory as clearHistoryApi, deleteHistoryEntry as deleteEntryApi, fetchHistory } from '@/api/comfy'
 import { INTL_LOCALE, i18n } from '@/i18n'
 import { catalog, sizeOf } from '@/stores/catalog'
 import { errorText, notify, notifyError } from '@/stores/notify'
@@ -68,5 +68,18 @@ export async function clearHistory() {
   } catch (err) {
     console.error('[history] failed to clear', err)
     notifyError(t('notify.historyClearFailed', { reason: errorText(err.code) }))
+  }
+}
+
+export async function deleteHistoryEntry(promptId) {
+  try {
+    await deleteEntryApi(promptId)
+    history.entries = history.entries.filter((e) => e.promptId !== promptId)
+    notify(t('notify.entryDeleted'))
+    return true
+  } catch (err) {
+    console.error('[history] failed to delete entry', err)
+    notifyError(t('notify.entryDeleteFailed', { reason: errorText(err.code) }))
+    return false
   }
 }

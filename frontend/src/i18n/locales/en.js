@@ -160,7 +160,14 @@ export default {
     expand: 'Expand history rail',
     expandUnread: 'Expand history rail ({n} new)',
     collapse: 'Collapse history rail',
+    resize: 'Drag to resize the history rail. Double-click to reset',
     viewAt: 'View history image {n} of {total} ({time})',
+    remove: {
+      aria: 'Delete history image {n} ({time})',
+      title: 'Delete this image',
+      desc: 'This removes the image from history. This cannot be undone.',
+      confirm: 'Delete',
+    },
     clear: {
       title: 'Clear all history',
       desc: 'This removes all {count} images from the history rail and cannot be undone.',
@@ -190,6 +197,8 @@ export default {
     historyLoadFailed: 'Failed to load history: {reason}',
     restored: 'All parameters restored: SEED {seed} ・ {width}×{height} ・ {steps} steps ・ CFG {cfg}',
     cleared: 'History cleared',
+    entryDeleted: 'Image deleted',
+    entryDeleteFailed: 'Failed to delete: {reason}',
     undo: 'Undo',
     restoreUndone: 'Parameters returned to before the restore',
     undoBusy: 'Undo failed: parameters are locked while generating',

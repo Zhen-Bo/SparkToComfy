@@ -161,7 +161,14 @@ export default {
     expand: '展開歷史紀錄欄',
     expandUnread: '展開歷史紀錄欄・{n} 張新圖',
     collapse: '收合歷史紀錄欄',
+    resize: '拖曳調整歷史欄寬度，雙擊恢復預設',
     viewAt: '放大檢視第 {n}/{total} 張歷史圖（{time}）',
+    remove: {
+      aria: '刪除第 {n} 張歷史圖（{time}）',
+      title: '刪除這張圖片',
+      desc: '將從歷史欄移除這張圖片，此動作無法復原。',
+      confirm: '確認刪除',
+    },
     clear: {
       title: '清除全部歷史紀錄',
       desc: '將從歷史欄移除全部 {count} 張圖片，此動作無法復原。',
@@ -191,6 +198,8 @@ export default {
     historyLoadFailed: '歷史讀取失敗：{reason}',
     restored: '已回填全部參數：SEED {seed} ・ {width}×{height} ・ {steps} 步 ・ CFG {cfg}',
     cleared: '已清除全部歷史紀錄',
+    entryDeleted: '已刪除這張圖片',
+    entryDeleteFailed: '刪除失敗：{reason}',
     undo: '復原',
     restoreUndone: '已復原為回填前的參數',
     undoBusy: '復原失敗：生成中不能更動參數',

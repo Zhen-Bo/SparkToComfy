@@ -64,6 +64,9 @@ export async function fetchHistory() {
 export const clearHistory = () =>
   request(`/history?sessionId=${encodeURIComponent(sessionId)}`, { method: 'DELETE' })
 
+export const deleteHistoryEntry = (promptId) =>
+  request(`/history?sessionId=${encodeURIComponent(sessionId)}&promptId=${encodeURIComponent(promptId)}`, { method: 'DELETE' })
+
 /** Returns `{ promptId }` as soon as the job is accepted, without waiting for an image.
  * Every step after that arrives over the WebSocket; the receipt repeats the id for a page that connects while the job is in flight. */
 export const submitGeneration = (payload) =>
