@@ -11,7 +11,7 @@
           {
             "name": "73152_v1_epoch26",
             "strength": 1,
-            "active": true,
+            "active": false,
             "expanded": false,
             "clipStrength": 1,
             "selected": false,
@@ -20,7 +20,7 @@
           {
             "name": "R9FG018QZ03G8N8C4JKMMKCJA0",
             "strength": 1,
-            "active": true,
+            "active": false,
             "expanded": false,
             "clipStrength": 1,
             "selected": false,
@@ -75,41 +75,12 @@
       "default_active": true,
       "allow_strength_adjustment": false,
       "toggle_trigger_words": {
-        "__value__": [
-          {
-            "text": "@73152",
-            "active": true,
-            "highlighted": false,
-            "strength": null,
-            "items": [
-              {
-                "text": "@73152",
-                "active": true,
-                "highlighted": false,
-                "strength": null
-              }
-            ]
-          },
-          {
-            "text": "omoomo",
-            "active": true,
-            "highlighted": false,
-            "strength": null,
-            "items": [
-              {
-                "text": "omoomo",
-                "active": true,
-                "highlighted": false,
-                "strength": null
-              }
-            ]
-          }
-        ]
+        "__value__": []
       },
-      "orinalMessage": "@73152,, omoomo",
+      "orinalMessage": "",
       "trigger_words": [
         "20737",
-        2
+        3
       ]
     },
     "class_type": "TriggerWord Toggle (LoraManager)",
@@ -146,7 +117,7 @@
   },
   "20742": {
     "inputs": {
-      "seed": 389366860893346,
+      "seed": 275868904134342,
       "steps": 30,
       "cfg": 4.5,
       "sampler_name": "euler_ancestral",
@@ -165,7 +136,7 @@
         0
       ],
       "latent_image": [
-        "20755",
+        "20756",
         2
       ]
     },
@@ -213,7 +184,7 @@
       "quality": 100,
       "embed_workflow": false,
       "save_clean_copy": false,
-      "enable_preview": true,
+      "enable_preview": false,
       "images": [
         "20753",
         0
@@ -374,14 +345,14 @@
       "title": "預覽圖片"
     }
   },
-  "20755": {
+  "20756": {
     "inputs": {
-      "preset_resolution": "1536",
-      "aspect_ratio": "16:9",
-      "orientation": "Custom",
+      "preset_resolution": "small",
+      "aspect_ratio": "square",
+      "orientation": "custom",
       "batch_size": 1,
-      "custom_width": 2048,
-      "custom_height": 880
+      "custom_width": 1024,
+      "custom_height": 1024
     },
     "class_type": "QuickLatent",
     "_meta": {
@@ -410,7 +381,7 @@
   },
   "20735:6196": {
     "inputs": {
-      "unet_name": "anima_aestheticV11.safetensors",
+      "unet_name": "anima\\anima_aestheticV11.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",

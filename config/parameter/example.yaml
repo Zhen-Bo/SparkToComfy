@@ -74,7 +74,7 @@ basic:
 
     # Presets come from config/size.yaml; the node needs custom_width and custom_height inputs.
     size:
-        node: "20755"
+        node: "20756"
         type: size
 
 advanced:

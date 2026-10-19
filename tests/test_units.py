@@ -69,7 +69,7 @@ EXAMPLE_PATCHED = {
     },
     "20744": {"resize_type.scale": 2},
     "20753": {"anything": ["20752", 0]},
-    "20755": {"custom_width": 1440, "custom_height": 1920},
+    "20756": {"custom_width": 1440, "custom_height": 1920},
     "20737": {
         "text": "",
         "loras": {
@@ -86,7 +86,7 @@ EXAMPLE_PATCHED = {
     "20738": {
         "orinalMessage": "",
         "toggle_trigger_words": {"__value__": []},
-        "trigger_words": ["20737", 2],
+        "trigger_words": ["20737", 3],
     },
 }
 
