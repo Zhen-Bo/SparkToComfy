@@ -179,12 +179,12 @@
   "20745": {
     "inputs": {
       "enable": true,
-      "filename_prefix": "API/%date:yyyy-MM-dd%/%model%/%date:hh-mm-ss%-%seed%",
+      "filename_prefix": "API/%date:yyyy-MM-dd%/%date:hh-mm-ss%-%seed%-%model%",
       "file_format": "PNG",
       "quality": 100,
       "embed_workflow": false,
       "save_clean_copy": false,
-      "enable_preview": false,
+      "enable_preview": true,
       "images": [
         "20753",
         0
