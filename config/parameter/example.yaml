@@ -10,9 +10,9 @@
 # Reloaded every 30 seconds; failed loads keep the previous catalog and log the error.
 #
 # Replace model/LoRA/sampler names with those installed on your ComfyUI instance:
-#   curl -s localhost:8188/object_info/UNETLoader           | jq '..|.unet_name?//empty|.[0]'
-#   curl -s localhost:8188/object_info/LoraLoaderModelOnly  | jq '..|.lora_name?//empty|.[0]'
-#   curl -s localhost:8188/object_info/KSampler             | jq '..|.sampler_name?//empty|.[0]'
+#   curl -s localhost:8188/object_info/UNETLoader              | jq '..|.unet_name?//empty|.[0]'
+#   curl -s 'localhost:8188/api/lm/loras/list?page_size=100'  | jq '.items[].file_name'
+#   curl -s localhost:8188/object_info/KSampler                | jq '..|.sampler_name?//empty|.[0]'
 
 # Fixed graph inputs, not exposed to the operator.
 hidden:
