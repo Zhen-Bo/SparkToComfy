@@ -193,6 +193,9 @@ config/
 2. Copy `config/parameter/example.yaml` and adapt it to the input controls your API needs.
 3. Register the workflow in `config/workflow.yaml`, pointing at both files.
 
+The `size` control offers the ratios in `config/size.yaml`, shared by every workflow.
+A workflow that needs other resolutions declares its own `presets` under its `size` control, in the same shape. They replace the shared list for that workflow only.
+
 Workflows reload every 30 seconds, so editing the YAML and adding a workflow both need no restart.
 
 ## Testing

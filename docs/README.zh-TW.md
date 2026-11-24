@@ -192,6 +192,9 @@ config/
 2. 複製 `config/parameter/example.yaml` 改成你 API 的對應輸入選項。
 3. 在 `config/workflow.yaml` 註冊，指到上面兩個檔案。
 
+`size` 控制項的比例來自 `config/size.yaml`，所有工作流共用。
+需要其他解析度的工作流，在自己的 `size` 控制項底下用相同格式宣告 `presets`，只會取代該工作流的清單。
+
 工作流每 30 秒自動重載，改 YAML 與新增 workflow 不需要重啟。
 
 ## 測試
