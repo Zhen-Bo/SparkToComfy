@@ -195,6 +195,7 @@ config/
 
 The `size` control offers the ratios in `config/size.yaml`, shared by every workflow.
 A workflow that needs other resolutions declares its own `presets` under its `size` control, in the same shape. They replace the shared list for that workflow only.
+The control writes the node's `custom_width` and `custom_height` inputs by default. A node with other input names declares them as `targets`, for example `targets: { width: width, height: height }`.
 
 Workflows reload every 30 seconds, so editing the YAML and adding a workflow both need no restart.
 

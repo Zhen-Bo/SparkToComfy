@@ -73,7 +73,8 @@ basic:
         default: ""
 
     # Presets come from config/size.yaml unless this control declares its own `presets` in the same shape.
-    # The node needs custom_width and custom_height inputs.
+    # Writes the node's custom_width and custom_height inputs; for other names, declare
+    #   targets: { width: width, height: height }
     size:
         node: "20756"
         type: size

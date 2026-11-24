@@ -113,10 +113,14 @@ def size_dims(control: dict, value: object) -> tuple[int, int]:
     return (height, width) if value["landscape"] else (width, height)
 
 
+_SIZE_TARGETS = {"width": "custom_width", "height": "custom_height"}
+
+
 def _patch_size(g: dict, p: dict, value: object) -> None:
     width, height = size_dims(p, value)
-    g[p["node"]]["inputs"]["custom_width"] = width
-    g[p["node"]]["inputs"]["custom_height"] = height
+    targets = p.get("targets", _SIZE_TARGETS)
+    g[p["node"]]["inputs"][targets["width"]] = width
+    g[p["node"]]["inputs"][targets["height"]] = height
 
 
 def _patch_lora(g: dict, p: dict, value: object) -> None:
@@ -239,6 +243,21 @@ def _check_positive_int(where: str, control: dict, key: str) -> None:
         raise RuntimeError(f"{where}: {key} must be a positive int, got {value!r}")
 
 
+def _check_size_targets(where: str, control: dict) -> None:
+    if "targets" not in control:
+        return
+    targets = control["targets"]
+    if (
+        not isinstance(targets, dict)
+        or set(targets) != set(_SIZE_TARGETS)
+        or not all(isinstance(v, str) and v for v in targets.values())
+        or targets["width"] == targets["height"]
+    ):
+        raise RuntimeError(
+            f"{where}: targets must name two distinct width and height inputs, got {targets!r}"
+        )
+
+
 def check_declaration(parameters: dict, workflow_id: str) -> None:
     for name, control in _user_controls(parameters).items():
         where = f"{workflow_id}.{name}"
@@ -246,3 +265,5 @@ def check_declaration(parameters: dict, workflow_id: str) -> None:
             if key not in control:
                 raise RuntimeError(f"{where}: {control['type']} control needs {key}")
         _check_positive_int(where, control, "max_length")
+        if control["type"] == "size":
+            _check_size_targets(where, control)
