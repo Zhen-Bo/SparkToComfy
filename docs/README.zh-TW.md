@@ -194,6 +194,7 @@ config/
 
 `size` 控制項的比例來自 `config/size.yaml`，所有工作流共用。
 需要其他解析度的工作流，在自己的 `size` 控制項底下用相同格式宣告 `presets`，只會取代該工作流的清單。
+這個控制項預設寫入節點的 `custom_width` 與 `custom_height`。輸入名稱不同的節點用 `targets` 宣告，例如 `targets: { width: width, height: height }`。
 
 工作流每 30 秒自動重載，改 YAML 與新增 workflow 不需要重啟。
 

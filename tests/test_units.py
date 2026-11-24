@@ -211,6 +211,59 @@ def test_check_declaration_rejects_bad_max_length(bad):
         controls.check_declaration(decl, "probe")
 
 
+def _size_decl(**extra):
+    return {
+        "basic": {
+            "size": {
+                "type": "size",
+                "node": "1",
+                "presets": {
+                    "square": {
+                        "label": "1:1",
+                        "icon": "square",
+                        "standard": {"width": 512, "height": 512},
+                        "highres": {"width": 1024, "height": 1024},
+                    }
+                },
+                **extra,
+            }
+        },
+        "advanced": {},
+        "hidden": {},
+    }
+
+
+def test_patch_size_writes_declared_targets():
+    decl = _size_decl(targets={"width": "width", "height": "height"})
+    controls.check_declaration(decl, "probe")
+    value = {"preset": "square", "highres": True, "landscape": False}
+    g = controls.patch({"1": {"inputs": {}}}, decl, {"size": value})
+    assert g["1"]["inputs"] == {"width": 1024, "height": 1024}, g["1"]["inputs"]
+
+
+def test_patch_size_defaults_to_custom_inputs():
+    value = {"preset": "square", "highres": False, "landscape": False}
+    g = controls.patch({"1": {"inputs": {}}}, _size_decl(), {"size": value})
+    assert g["1"]["inputs"] == {"custom_width": 512, "custom_height": 512}, g
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "width",
+        {"width": "width"},
+        {"width": "width", "height": "height", "batch": "batch_size"},
+        {"width": "", "height": "height"},
+        {"width": 1, "height": "height"},
+        {"width": "same", "height": "same"},
+    ],
+)
+def test_check_declaration_rejects_bad_size_targets(bad):
+    with pytest.raises(RuntimeError) as err:  # malformed targets must fail at load
+        controls.check_declaration(_size_decl(targets=bad), "probe")
+    assert "probe.size" in str(err.value), str(err.value)
+
+
 def test_load_workflows_checks_every_declaration(example_registry):
     with mock.patch.object(controls, "check_declaration") as fake_check:
         loaded = load_workflows(example_registry)

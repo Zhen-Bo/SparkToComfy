@@ -2,6 +2,7 @@ import copy
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Literal, get_args
 
 ControlType = Literal[
@@ -20,6 +21,7 @@ class InvalidControlValue(ValueError):
 
 
 _SEED_MAX = 2**53 - 1  # JS number precision limit. Do not raise this to 2**64 - 1.
+_SIZE_TARGETS = MappingProxyType({"width": "custom_width", "height": "custom_height"})
 
 
 def _check_dropdown(name: str, raw: object, control: dict) -> object:
@@ -65,6 +67,21 @@ def _check_size(name: str, raw: object, control: dict) -> object:
         if not isinstance(raw[flag], bool):
             raise InvalidControlValue(name, "invalid")
     return raw
+
+
+def _check_size_targets(where: str, control: dict) -> None:
+    if "targets" not in control:
+        return
+    targets = control["targets"]
+    if (
+        not isinstance(targets, dict)
+        or set(targets) != set(_SIZE_TARGETS)
+        or not all(isinstance(v, str) and v for v in targets.values())
+        or targets["width"] == targets["height"]
+    ):
+        raise RuntimeError(
+            f"{where}: targets must name two distinct width and height inputs, got {targets!r}"
+        )
 
 
 def _lora_file(name: str, file: object, allowed: set[str], seen: set[str]) -> str:
@@ -115,8 +132,9 @@ def size_dims(control: dict, value: object) -> tuple[int, int]:
 
 def _patch_size(g: dict, p: dict, value: object) -> None:
     width, height = size_dims(p, value)
-    g[p["node"]]["inputs"]["custom_width"] = width
-    g[p["node"]]["inputs"]["custom_height"] = height
+    targets = p.get("targets", _SIZE_TARGETS)
+    g[p["node"]]["inputs"][targets["width"]] = width
+    g[p["node"]]["inputs"][targets["height"]] = height
 
 
 def _patch_lora(g: dict, p: dict, value: object) -> None:
@@ -137,6 +155,7 @@ class _Kind:
     patch: Callable[[dict, dict, object], None]
     required: tuple[str, ...]
     default_factory: Callable[[], object] | None = None
+    check_declaration: Callable[[str, dict], None] | None = None
 
 
 _KINDS: dict[ControlType, _Kind] = {
@@ -148,7 +167,12 @@ _KINDS: dict[ControlType, _Kind] = {
         _check_input, _patch_direct, ("node", "target", "value_kind", "min", "max")
     ),
     "seed": _Kind(_check_seed, _patch_direct, ("node", "target")),
-    "size": _Kind(_check_size, _patch_size, ("node", "presets")),
+    "size": _Kind(
+        _check_size,
+        _patch_size,
+        ("node", "presets"),
+        check_declaration=_check_size_targets,
+    ),
     "lora": _Kind(
         _check_lora, _patch_lora, ("node", "options", "strength"), default_factory=list
     ),
@@ -242,7 +266,10 @@ def _check_positive_int(where: str, control: dict, key: str) -> None:
 def check_declaration(parameters: dict, workflow_id: str) -> None:
     for name, control in _user_controls(parameters).items():
         where = f"{workflow_id}.{name}"
-        for key in _kind(control).required:
+        kind = _kind(control)
+        for key in kind.required:
             if key not in control:
                 raise RuntimeError(f"{where}: {control['type']} control needs {key}")
         _check_positive_int(where, control, "max_length")
+        if kind.check_declaration is not None:
+            kind.check_declaration(where, control)
