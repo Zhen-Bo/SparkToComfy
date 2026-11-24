@@ -72,7 +72,8 @@ basic:
         max_length: 500
         default: ""
 
-    # Presets come from config/size.yaml; the node needs custom_width and custom_height inputs.
+    # Presets come from config/size.yaml unless this control declares its own `presets` in the same shape.
+    # The node needs custom_width and custom_height inputs.
     size:
         node: "20756"
         type: size

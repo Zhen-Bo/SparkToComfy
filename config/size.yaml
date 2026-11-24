@@ -1,4 +1,4 @@
-# Size presets, shared by every workflow: a `size` control declares no presets of its own and is given these at load time.
+# Default size presets: a `size` control that declares no `presets` of its own is given these at load time.
 # Each ratio carries two resolutions, and the panel's landscape toggle swaps width and height rather than adding more entries.
 # `icon` picks the glyph the ratio button draws.
 presets:

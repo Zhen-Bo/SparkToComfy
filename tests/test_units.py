@@ -5,6 +5,7 @@ from unittest import mock
 
 import httpx
 import pytest
+import yaml
 from fastapi import HTTPException
 
 from app.comfy import client as comfy_client
@@ -15,6 +16,7 @@ from app.jobs import eta as eta_module
 from app.jobs.eta import COLD_START_SECONDS, EtaModel
 from app.jobs.models import Job
 from app.lora.router import get_cover
+from app.settings import ROOT
 
 
 @pytest.fixture
@@ -223,6 +225,46 @@ def test_load_workflows_propagates_declaration_error(example_registry):
     ):
         with pytest.raises(RuntimeError):
             load_workflows(example_registry)
+
+
+def test_load_workflows_keeps_declared_size_presets(tmp_path):
+    custom = {
+        "cinema": {
+            "label": "21:9",
+            "icon": "cinema",
+            "standard": {"width": 1536, "height": 658},
+            "highres": {"width": 2048, "height": 878},
+        }
+    }
+    parameters = (ROOT / "config" / "parameter" / "example.yaml").read_text(
+        encoding="utf-8"
+    )
+    decl = yaml.safe_load(parameters)
+    decl["basic"]["size"]["presets"] = custom
+    (tmp_path / "custom.yaml").write_text(yaml.safe_dump(decl), encoding="utf-8")
+    registry = tmp_path / "workflow.yaml"
+    registry.write_text(
+        yaml.safe_dump(
+            {
+                "workflows": {
+                    "custom": {
+                        "name": "Custom",
+                        "parameter": str(tmp_path / "custom.yaml"),
+                        "workflow": "config/workflow/example.json",
+                    },
+                    "example": {
+                        "name": "Example",
+                        "parameter": "config/parameter/example.yaml",
+                        "workflow": "config/workflow/example.json",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    loaded = load_workflows(registry)
+    assert loaded["custom"]["parameters"]["basic"]["size"]["presets"] == custom
+    assert "square" in loaded["example"]["parameters"]["basic"]["size"]["presets"]
 
 
 def test_declared_multiline_defaults_fit_max_length(workflows):

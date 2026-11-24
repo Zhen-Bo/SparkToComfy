@@ -32,7 +32,7 @@ SETTINGS = ServerSettings()  # pyright: ignore[reportCallIssue]  # values come f
 
 
 def load_workflows(registry: Path = REGISTRY) -> dict:
-    """Return {workflow_id: {name, parameters, graph}}. All workflows share the size presets."""
+    """Return {workflow_id: {name, parameters, graph}}. Size controls without presets get the shared ones."""
     presets = yaml.safe_load(
         (ROOT / "config" / "size.yaml").read_text(encoding="utf-8")
     )["presets"]
@@ -41,7 +41,7 @@ def load_workflows(registry: Path = REGISTRY) -> dict:
     for wid, w in data["workflows"].items():
         parameters = yaml.safe_load((ROOT / w["parameter"]).read_text(encoding="utf-8"))
         for _, control in controls.all_of_type(parameters, "size"):
-            control["presets"] = presets
+            control.setdefault("presets", presets)
         workflows[wid] = {
             "name": w["name"],
             "parameters": parameters,
